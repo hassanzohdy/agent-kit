@@ -69,6 +69,9 @@ export const watchCommand = defineCommand({
     if (scanPaths && scanPaths.length > 0) {
       logger.info(`Extra scan paths: ${scanPaths.join(", ")}`);
     }
+    logger.info(
+      "Claude Code picks up changes on the next prompt. Other agents may need a window/session reload after each re-sync.",
+    );
 
     const watcher = chokidar.watch(watchTargets, {
       ignoreInitial: true,

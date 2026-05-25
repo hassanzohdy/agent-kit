@@ -80,6 +80,11 @@ export const syncCommand = defineCommand({
       logger.success(
         `Exported ${result.exported} skill(s) from ${result.packages.length} package(s) to: ${result.targets.join(", ")}`,
       );
+      if (result.exported > 0) {
+        logger.info(
+          "Claude Code picks up new skills on the next prompt. Other agents (Cursor, Copilot, Codex, Gemini, Kiro, Antigravity) may need a window or session reload.",
+        );
+      }
       if (result.skipped > 0) {
         logger.info(
           `Skipped ${result.skipped} user-authored folder(s). Pass --override to replace them.`,

@@ -13,7 +13,7 @@ Three commands. All are idempotent — running them twice in a row is a no-op th
 Scaffold a starter `AGENTS.md` (only if it does not exist) and derive the per-tool files from it.
 
 ```bash
-yarn agent-kit init
+npx agent-kit init
 ```
 
 Flags:
@@ -31,12 +31,12 @@ Behavior:
 Re-derive the per-tool files from `AGENTS.md` and export skills from installed packages.
 
 ```bash
-yarn agent-kit sync
-yarn agent-kit sync --target claude,cursor
-yarn agent-kit sync --derive-only
-yarn agent-kit sync --skills-only
-yarn agent-kit sync --path @warlock.js
-yarn agent-kit sync --override
+npx agent-kit sync
+npx agent-kit sync --target claude,cursor
+npx agent-kit sync --derive-only
+npx agent-kit sync --skills-only
+npx agent-kit sync --path @warlock.js
+npx agent-kit sync --override
 ```
 
 Flags:
@@ -63,8 +63,8 @@ This is the command to wire into your project's `postinstall`:
 Watch `AGENTS.md`, the project's local `skills/**/SKILL.md`, and every `node_modules/**/skills/**/SKILL.md`; re-derive and re-sync on change. Intended for the active dev loop when editing skills locally and for monorepo / path-linked setups where `postinstall` does not re-fire.
 
 ```bash
-yarn agent-kit watch
-yarn agent-kit watch --path @warlock.js
+npx agent-kit watch
+npx agent-kit watch --path @warlock.js
 ```
 
 Flags:

@@ -24,7 +24,7 @@ export function buildDerivedContent(
     `  This file is auto-generated from ${sourceFile} by agent-kit for ${target.label}.`,
     "  Do not edit directly — your changes will be overwritten on the next sync.",
     `  Source: ./${sourceFile}`,
-    "  Regenerate: yarn agent-kit sync",
+    "  Regenerate: npx agent-kit sync",
     "-->",
     "",
     "",

@@ -19,9 +19,9 @@ npm install -D @mongez/agent-kit   # or yarn add -D @mongez/agent-kit, or pnpm a
 ## Quick start
 
 ```bash
-yarn agent-kit init                         # Scaffold AGENTS.md + derive (idempotent)
-yarn agent-kit sync                         # Derive + sync skills
-yarn agent-kit watch                        # Re-sync on change (dev loop)
+npx agent-kit init                         # Scaffold AGENTS.md + derive (idempotent)
+npx agent-kit sync                         # Derive + sync skills
+npx agent-kit watch                        # Re-sync on change (dev loop)
 ```
 
 Wire into postinstall:
