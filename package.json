@@ -1,0 +1,63 @@
+{
+  "name": "@mongez/agent-kit",
+  "version": "1.0.3",
+  "description": "Authoring and distribution toolkit for AI coding agent artifacts: AGENTS.md derivation, skills sync, and multi-agent config scaffolding.",
+  "type": "module",
+  "main": "./cjs/index.js",
+  "module": "./cjs/index.js",
+  "types": "./cjs/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./cjs/index.d.ts",
+      "import": "./cjs/index.js"
+    }
+  },
+  "bin": {
+    "agent-kit": "./bin/agent-kit.js"
+  },
+  "files": [
+    "cjs",
+    "bin",
+    "skills",
+    "llms.txt",
+    "llms-full.txt",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "citty": "^0.1.6",
+    "consola": "^3.4.0",
+    "pathe": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hassanzohdy/agent-kit"
+  },
+  "keywords": [
+    "agents.md",
+    "ai-agents",
+    "claude",
+    "codex",
+    "cursor",
+    "gemini",
+    "copilot",
+    "aider",
+    "kiro",
+    "antigravity",
+    "skills"
+  ],
+  "author": "hassanzohdy",
+  "license": "MIT"
+}

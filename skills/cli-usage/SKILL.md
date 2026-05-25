@@ -1,0 +1,111 @@
+---
+name: mongez-agent-kit-cli-usage
+description: Exact commands, flags, and typical wiring for agent-kit.
+when_to_use: User is invoking, editing, or debugging an `agent-kit` CLI command (`init` / `sync` / `watch`), wiring `postinstall: agent-kit sync` into a project's `package.json`, hits a CLI flag (`--path`, `--target`, `--override`, `--skills-only`, `--derive-only`) they don't recognize, or asks how to make agent-kit run in CI / on every install / during the dev loop. Do NOT load for general questions about what agent-kit is — load `mongez-agent-kit-overview` instead.
+---
+
+# agent-kit CLI usage
+
+Three commands. All are idempotent — running them twice in a row is a no-op the second time.
+
+## `agent-kit init`
+
+Scaffold a starter `AGENTS.md` (only if it does not exist) and derive the per-tool files from it.
+
+```bash
+yarn agent-kit init
+```
+
+Flags:
+
+- `--cwd <path>` — start from a different working directory (defaults to `process.cwd()`).
+
+Behavior:
+
+- If `AGENTS.md` exists → leave it alone.
+- If `AGENTS.md` is missing → write a starter template.
+- Always derives `CLAUDE.md`, `.gemini/GEMINI.md`, `.github/copilot-instructions.md`, `CONVENTIONS.md`.
+
+## `agent-kit sync`
+
+Re-derive the per-tool files from `AGENTS.md` and export skills from installed packages.
+
+```bash
+yarn agent-kit sync
+yarn agent-kit sync --target claude,cursor
+yarn agent-kit sync --derive-only
+yarn agent-kit sync --skills-only
+yarn agent-kit sync --path @warlock.js
+yarn agent-kit sync --override
+```
+
+Flags:
+
+- `--cwd <path>` — working directory override.
+- `--target <names>` — comma-separated skill targets. Valid: `claude`, `copilot`, `cursor`, `codex`, `opencode`, `amp`, `goose`. Defaults to `claude`.
+- `--derive-only` — skip skills export.
+- `--skills-only` — skip derivation.
+- `--path <dirs>` / `-p` — comma-separated extra dirs to scan, each treated like a `node_modules/`. Use for monorepos (`yarn workspaces`, `pnpm workspaces`) or local dev setups where framework packages live outside `node_modules/`. Packages found in scan paths override same-named entries in `node_modules/`.
+- `--override` — replace user-authored destination folders (those without our `.agent-kit-managed` sentinel). Skipped with a warning by default.
+
+This is the command to wire into your project's `postinstall`:
+
+```json
+{
+  "scripts": {
+    "postinstall": "agent-kit sync"
+  }
+}
+```
+
+## `agent-kit watch`
+
+Watch `AGENTS.md`, the project's local `skills/**/SKILL.md`, and every `node_modules/**/skills/**/SKILL.md`; re-derive and re-sync on change. Intended for the active dev loop when editing skills locally and for monorepo / path-linked setups where `postinstall` does not re-fire.
+
+```bash
+yarn agent-kit watch
+yarn agent-kit watch --path @warlock.js
+```
+
+Flags:
+
+- `--cwd <path>` — working directory override.
+- `--path <dirs>` / `-p` — extra dirs whose `**/skills/**/SKILL.md` should also be watched.
+- `--override` — replace user-authored destination folders on each re-sync.
+
+Behavior:
+
+- Performs a full sync on startup so the working tree is consistent.
+- Listens for `add`/`change`/`unlink` events on all four watch sets (`AGENTS.md`, local `skills/`, `node_modules/`, extra paths).
+- Debounces re-syncs by 150ms.
+
+## Programmatic API
+
+```typescript
+import {
+  deriveAll,
+  syncSkills,
+  findProjectRoot,
+  scanForSkillPackages,
+  deriveSlugForSkill,
+} from "@mongez/agent-kit";
+
+const root = await findProjectRoot();
+if (!root) throw new Error("No package.json found");
+
+const derived = await deriveAll({ root, targets: ["claude"] });
+const skills = await syncSkills({
+  root,
+  targets: ["claude", "cursor"],
+  scanPaths: ["@warlock.js"],  // optional: extra scan roots beyond node_modules
+  override: false,             // optional: replace user-authored dest folders
+});
+
+// skills.exported, skills.pruned, skills.skipped, skills.packages, skills.scannedPaths
+```
+
+## Exit behavior
+
+- All commands exit 0 on success.
+- `init` / `sync` exit non-zero if `AGENTS.md` is missing (only for `sync`; `init` creates one).
+- `watch` runs until the process is killed.
