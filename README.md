@@ -32,15 +32,27 @@ pnpm add -D @mongez/agent-kit
 
 ## Quick start
 
-From your project root:
+From your project root.
+
+**Scaffold `AGENTS.md` and derive all tool-specific files:**
 
 ```bash
-npx agent-kit init           # Scaffold AGENTS.md + derive all tool files
-npx agent-kit sync           # Re-derive + sync skills from node_modules
-npx agent-kit watch          # Re-sync on every change (dev loop)
+npx agent-kit init
 ```
 
-Then make it automatic — add a `postinstall` hook so skills + derived files stay fresh after every `yarn install`:
+**Re-derive and sync skills from `node_modules`:**
+
+```bash
+npx agent-kit sync
+```
+
+**Watch and re-sync on every change (dev loop):**
+
+```bash
+npx agent-kit watch
+```
+
+Then make it automatic — add a `postinstall` hook so skills + derived files stay fresh after every install:
 
 ```json
 {
