@@ -1,7 +1,9 @@
 ---
 name: mongez-agent-kit-overview
-description: What agent-kit is, what it does, and when an agent should reach for it.
-when_to_use: User asks about agent-kit itself, AGENTS.md derivation, how skills get from npm packages into `.claude/skills/`, why a folder shows up as `<pkg-slug>-<skill-name>` in `.claude/skills/`, or wants a mental model of the tool before diving into specifics. Load BEFORE `mongez-agent-kit-cli-usage` and `mongez-agent-kit-authoring-skills` so the bigger picture is in context first.
+description: |
+  What agent-kit is, what it does, and when an agent should reach for it — the front-door mental model covering `AGENTS.md` derivation, npm-package skill distribution, flat folder naming (`<pkg-slug>-<skill-path>`), and the `.agent-kit-managed` sentinel.
+  TRIGGER when: project contains `AGENTS.md`, `CLAUDE.md`, `.gemini/GEMINI.md`, `.github/copilot-instructions.md`, or `CONVENTIONS.md`; folder `.claude/skills/<pkg-slug>-*/` or `.agent-kit-managed` sentinel exists; user asks "what is agent-kit", "how does AGENTS.md derivation work", "how do skills get into `.claude/skills/`", or "why is my skill folder named `<pkg-slug>-<skill>`"; `package.json` has `agentKit` config block or `postinstall: agent-kit sync`; `import { deriveAll, syncSkills, findProjectRoot } from "@mongez/agent-kit"`.
+  SKIP: user is invoking, scripting, or debugging a specific CLI command / flag — load `mongez-agent-kit-cli-usage` instead; user is authoring a `SKILL.md` inside an npm package they publish — load `mongez-agent-kit-authoring-skills` instead; runtime AI features (model calls, embeddings) belong in `@warlock.js/ai*`, not here.
 ---
 
 # agent-kit — Overview

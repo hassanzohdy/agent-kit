@@ -82,6 +82,9 @@ await syncSkills({
 
 # Skill: overview
 
+> **Auto-trigger:** project contains `AGENTS.md`, `CLAUDE.md`, `.gemini/GEMINI.md`, `.github/copilot-instructions.md`, or `CONVENTIONS.md`; folder `.claude/skills/<pkg-slug>-*/` or `.agent-kit-managed` sentinel exists; user asks "what is agent-kit", "how does AGENTS.md derivation work", "how do skills get into `.claude/skills/`", or "why is my skill folder named `<pkg-slug>-<skill>`"; `package.json` has `agentKit` config block or `postinstall: agent-kit sync`; `import { deriveAll, syncSkills, findProjectRoot } from "@mongez/agent-kit"`.
+> **Skip when:** user is invoking, scripting, or debugging a specific CLI command / flag — load `mongez-agent-kit-cli-usage` instead; user is authoring a `SKILL.md` inside an npm package they publish — load `mongez-agent-kit-authoring-skills` instead; runtime AI features (model calls, embeddings) belong in `@warlock.js/ai*`, not here.
+
 `agent-kit` solves two distinct but related problems for projects that work with AI coding agents:
 
 1. **One `AGENTS.md`, every agent.** `AGENTS.md` is the open standard — Codex, Cursor, Amp, Jules, Factory, Kilo, Windsurf, OpenCode read it natively. Claude Code, Gemini CLI, GitHub Copilot, and Aider want their own file. agent-kit derives them so they never drift.
@@ -110,6 +113,9 @@ await syncSkills({
 ---
 
 # Skill: cli-usage
+
+> **Auto-trigger:** command line invokes `agent-kit init`, `agent-kit sync`, or `agent-kit watch` (or `npx agent-kit ...`); `package.json` has `"postinstall": "agent-kit sync"` or any `agent-kit` script; flags `--target`, `--path`, `-p`, `--override`, `--skills-only`, `--derive-only`, `--cwd` appear; user asks "how do I wire agent-kit into CI / postinstall / monorepo", "what does `--path` do", "how do I run agent-kit on every install", or "how do I sync skills for cursor/claude/copilot"; code imports `deriveAll`, `syncSkills`, `findProjectRoot`, `scanForSkillPackages`, or `deriveSlugForSkill` from `@mongez/agent-kit`.
+> **Skip when:** general "what is agent-kit / mental model" questions — load `mongez-agent-kit-overview` instead; authoring a `SKILL.md` to ship from an npm package — load `mongez-agent-kit-authoring-skills` instead; tasks unrelated to invoking the agent-kit binary or its API.
 
 Three commands. All are idempotent — running them twice in a row is a no-op the second time.
 
@@ -185,6 +191,9 @@ Flags:
 ---
 
 # Skill: authoring-skills
+
+> **Auto-trigger:** editing a `skills/**/SKILL.md` inside an npm package the user maintains; user asks "how do I ship a skill with my package", "how do consumers pick up my skill", "what should go in SKILL.md frontmatter", or "how should I write `when_to_use` / `description`"; `package.json` `files` field needs `"skills"` added; multi-skill package needs a "front-door" / `<pkg>-overview` orientation skill; user is structuring nested skills (`skills/backend/auth/SKILL.md`) under a category folder.
+> **Skip when:** user is invoking the agent-kit CLI or wiring `postinstall` — load `mongez-agent-kit-cli-usage` instead; user just wants the mental model of agent-kit — load `mongez-agent-kit-overview` instead; project-local skills inside an app the user is NOT publishing to npm (no special authoring concerns — just drop a `skills/` folder).
 
 If you maintain a library that benefits from a coding-agent skill, you can ship that skill with your package. Anyone using `agent-kit sync` in a downstream project will receive your skill in their `.claude/skills/`, `.cursor/skills/`, etc.
 

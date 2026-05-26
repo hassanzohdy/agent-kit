@@ -1,7 +1,9 @@
 ---
 name: mongez-agent-kit-authoring-skills
-description: How to ship reusable skills from an npm package so consumers using agent-kit pick them up automatically.
-when_to_use: User is authoring or maintaining an npm package they intend to publish AND wants to bundle `SKILL.md` files with it, OR editing a `SKILL.md` file inside a package they own, OR asking how their package's skills become discoverable downstream when a consumer installs it. Triggers on package-author workflows specifically — NOT on "I want to write a project-local skill for my app" (that's just `mongez-agent-kit-overview` + drop a `skills/` folder; no special authoring concerns).
+description: |
+  How to ship reusable skills from an npm package so consumers using `agent-kit sync` pick them up automatically — folder layout, `SKILL.md` frontmatter (`description`, `when_to_use`, `name`), the `files` field, flat destination naming, and the front-door / subskill convention.
+  TRIGGER when: editing a `skills/**/SKILL.md` inside an npm package the user maintains; user asks "how do I ship a skill with my package", "how do consumers pick up my skill", "what should go in SKILL.md frontmatter", or "how should I write `when_to_use` / `description`"; `package.json` `files` field needs `"skills"` added; multi-skill package needs a "front-door" / `<pkg>-overview` orientation skill; user is structuring nested skills (`skills/backend/auth/SKILL.md`) under a category folder.
+  SKIP: user is invoking the agent-kit CLI or wiring `postinstall` — load `mongez-agent-kit-cli-usage` instead; user just wants the mental model of agent-kit — load `mongez-agent-kit-overview` instead; project-local skills inside an app the user is NOT publishing to npm (no special authoring concerns — just drop a `skills/` folder).
 ---
 
 # Authoring skills for distribution via agent-kit
