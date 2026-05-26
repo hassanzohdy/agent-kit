@@ -44,7 +44,7 @@ npx agent-kit sync --override
 Flags:
 
 - `--cwd <path>` — working directory override.
-- `--target <names>` — comma-separated skill targets. Valid: `claude`, `copilot`, `cursor`, `codex`, `opencode`, `amp`, `goose`. Defaults to `claude`.
+- `--target <names>` — comma-separated skill targets. Valid: `claude`, `copilot`, `cursor`, `codex`, `opencode`, `amp`, `goose`, `kiro`, `antigravity`. Defaults to `claude`.
 - `--derive-only` — skip skills export.
 - `--skills-only` — skip derivation.
 - `--path <dirs>` / `-p` — comma-separated extra dirs to scan, each treated like a `node_modules/`. Use for monorepos (`yarn workspaces`, `pnpm workspaces`) or local dev setups where framework packages live outside `node_modules/`. Packages found in scan paths override same-named entries in `node_modules/`.
