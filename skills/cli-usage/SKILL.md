@@ -2,8 +2,6 @@
 name: mongez-agent-kit-cli-usage
 description: |
   Exact commands, flags, and typical wiring for the `agent-kit` CLI (`init` / `sync` / `watch`) and its programmatic counterparts.
-  TRIGGER when: command line invokes `agent-kit init`, `agent-kit sync`, or `agent-kit watch` (or `npx agent-kit ...`); `package.json` has `"postinstall": "agent-kit sync"` or any `agent-kit` script; flags `--target`, `--path`, `-p`, `--override`, `--skills-only`, `--derive-only`, `--cwd` appear; user asks "how do I wire agent-kit into CI / postinstall / monorepo", "what does `--path` do", "how do I run agent-kit on every install", or "how do I sync skills for cursor/claude/copilot"; code imports `deriveAll`, `syncSkills`, `findProjectRoot`, `scanForSkillPackages`, or `deriveSlugForSkill` from `@mongez/agent-kit`.
-  SKIP: general "what is agent-kit / mental model" questions — load `mongez-agent-kit-overview` instead; authoring a `SKILL.md` to ship from an npm package — load `mongez-agent-kit-authoring-skills` instead; tasks unrelated to invoking the agent-kit binary or its API.
 ---
 
 # agent-kit CLI usage

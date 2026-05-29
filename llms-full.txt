@@ -98,20 +98,6 @@ await syncSkills({
 - **Sentinel-based prune.** Only folders with `.agent-kit-managed` get blown away on re-sync. User-authored skills are safe.
 - **Stateless.** Every sync re-derives from disk truth. No lockfile, no cache.
 
-## When to use it
-
-- A project adopting AI coding agent workflows wants a single source of truth for project instructions.
-- A package author wants to ship reusable skills that downstream consumers can use without copy-paste.
-- Project maintainers want to keep `CLAUDE.md`, `.gemini/GEMINI.md`, etc. in sync with `AGENTS.md` automatically.
-
-## When NOT to use it
-
-- You only target a single coding agent and never plan to change. Just write its native file directly.
-- You want runtime AI features (model calls, prompts, embeddings). Those live in `@warlock.js/ai*`.
-- You want to publish docs for browsing LLMs (`llms.txt`, `llms-full.txt`) for your app. Different audience, different lifecycle.
-
----
-
 # Skill: cli-usage
 
 > **Auto-trigger:** command line invokes `agent-kit init`, `agent-kit sync`, or `agent-kit watch` (or `npx agent-kit ...`); `package.json` has `"postinstall": "agent-kit sync"` or any `agent-kit` script; flags `--target`, `--path`, `-p`, `--override`, `--skills-only`, `--derive-only`, `--cwd` appear; user asks "how do I wire agent-kit into CI / postinstall / monorepo", "what does `--path` do", "how do I run agent-kit on every install", or "how do I sync skills for cursor/claude/copilot"; code imports `deriveAll`, `syncSkills`, `findProjectRoot`, `scanForSkillPackages`, or `deriveSlugForSkill` from `@mongez/agent-kit`.
@@ -276,9 +262,6 @@ description: One sentence telling an agent when to read this skill.
 ---
 
 # Using the thing
-
-## When to use
-Specific situations the agent should recognize.
 
 ## How to use
 Concrete steps, with code examples where it helps.

@@ -85,7 +85,46 @@ This writes a starter `AGENTS.md` at the project root (only if one does not alre
 
 From now on, every `yarn install` re-derives the per-tool files from `AGENTS.md` and mirrors skills from installed packages into `.claude/skills/`. Edit `AGENTS.md`, run `npx agent-kit sync`, and every supported agent picks up the change.
 
-> **Reload behavior.** Claude Code reads new and updated skills live — they show up on your next prompt within the same session, no restart needed. Other agents (Cursor, GitHub Copilot, Codex IDE, Gemini, Kiro, Antigravity) typically need a window or session reload to pick up newly-synced skills. One Claude Code edge case: if `.claude/skills/` did not exist when your session started, restart Claude after the first sync so it discovers the new directory.
+---
+
+## Set up with your agent
+
+Pick your agent below for the exact `--target` flag, the files agent-kit creates, and the reload step. The full per-IDE walkthroughs (with copy-pasteable `package.json` snippets) live in the [**Agent integrations**](https://mongez.js.org/agent-kit/agent-integrations/) docs page.
+
+| Agent | `--target` | Derived file | Skills folder | Reload |
+|---|---|---|---|---|
+| **Claude Code** | `claude` | `CLAUDE.md` | `.claude/skills/` | **live** — picked up next prompt |
+| **Cursor** | `cursor` | — (reads `AGENTS.md` natively) | `.cursor/skills/` | window reload |
+| **Codex** | `codex` | — (reads `AGENTS.md` natively) | `.codex/skills/` | next session |
+| **Kiro** | `kiro` | — (reads `AGENTS.md` natively) | `.kiro/skills/` | window reload |
+| **GitHub Copilot** | `copilot` | `.github/copilot-instructions.md` | `.github/skills/` | window reload |
+| **Antigravity** | `antigravity` | — (reads `AGENTS.md` natively) | `.agent/skills/` | window reload |
+| **Gemini CLI** | _derive-only_ | `.gemini/GEMINI.md` | _not supported_ | every invocation |
+| **Aider** | _derive-only_ | `CONVENTIONS.md` | _not supported_ | every session |
+
+```sh
+# Most common case — claude is the default target
+npx agent-kit sync
+
+# Multiple agents on the same project
+npx agent-kit sync --target claude,cursor,codex
+
+# Derive-only agents (Gemini, Aider) — skip the skills export
+npx agent-kit sync --derive-only
+```
+
+Or pin the choice in `package.json` so contributors don't have to remember:
+
+```json
+{
+  "scripts": { "postinstall": "agent-kit sync" },
+  "agentKit": { "targets": ["claude", "cursor"] }
+}
+```
+
+The derive step always emits `CLAUDE.md`, `.gemini/GEMINI.md`, `.github/copilot-instructions.md`, and `CONVENTIONS.md` regardless of `targets` — the array gates only the **skills** export. So a `["claude", "cursor"]` config keeps every derived file fresh AND mirrors skills into Claude + Cursor.
+
+> **Reload quirk shared across most agents:** if the skills directory (e.g. `.cursor/skills/`) didn't exist when your IDE session started, reload the window once after the first sync so it discovers the new directory. Claude Code is the exception — it picks up skills live.
 
 ---
 
