@@ -200,6 +200,10 @@ async function walkForNestedSkills(
     return [];
   }
 
+  // Sort so the walk order (and resulting skill order) is stable across
+  // filesystems — `readdir` order differs between Linux and Windows.
+  entries.sort((a, b) => a.name.localeCompare(b.name));
+
   // Leaf: this directory IS a skill (has SKILL.md) and we're below the root
   const hasSkillMd = entries.some(
     (entry) => entry.isFile() && entry.name === "SKILL.md",
@@ -264,7 +268,10 @@ export async function scanLocalPackage(
 
 async function safeReaddir(dir: string): Promise<string[]> {
   try {
-    return await readdir(dir);
+    // Sort so discovery order is stable across filesystems — `readdir` returns
+    // entries in directory order, which differs between Linux (ext4) and
+    // Windows (NTFS). Sorting keeps results deterministic everywhere.
+    return (await readdir(dir)).sort((a, b) => a.localeCompare(b));
   } catch {
     return [];
   }

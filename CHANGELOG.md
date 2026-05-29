@@ -4,6 +4,18 @@ All notable changes to `@mongez/agent-kit` are documented here. The format follo
 
 ---
 
+## [1.0.20]
+
+### Fixed
+
+- **Cross-platform skill discovery order** — `scanForSkillPackages` and the nested-skill walk now sort their `readdir` results, so the set and order of discovered skills is identical on Linux (ext4) and Windows (NTFS). Previously the order tracked raw directory order, which differs per filesystem and made order-sensitive output non-deterministic in CI.
+
+### Added
+
+- **CI test workflow** — `.github/workflows/test.yml` runs the suite on Node 20/22 (ubuntu) plus Node 20 (windows) for path/CRLF coverage. Node 18 is excluded because a transitive test dependency (`chokidar@5`) requires Node >=20.19; the CLI itself still runs on Node 18+ at runtime.
+
+---
+
 ## [1.0.19] — Docs overhaul
 
 ### Added
