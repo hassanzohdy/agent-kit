@@ -229,7 +229,34 @@ Every derived file is prefixed with an HTML-comment header noting the source fil
 
 ## Skills
 
-`syncSkills` (and `agent-kit sync`) walks `node_modules/` for any package whose root contains a `skills/` folder, then copies each skill directory into the per-agent target paths with a flat, collision-proof folder name.
+`syncSkills` (and `agent-kit sync`) reads `skills/` from your **project root** and from every package inside `node_modules/`, then copies each skill directory into the per-agent target paths with a flat, collision-proof folder name.
+
+### Organize your project's own skills in one nested folder
+
+You don't need to publish a package to use skills. Drop a single `skills/` folder at your **project root** and organize it however you think — grouped into category folders, nested as deep as you like:
+
+```
+my-app/
+└── skills/
+    ├── backend/
+    │   ├── auth/SKILL.md
+    │   └── jobs/SKILL.md
+    ├── frontend/
+    │   └── forms/SKILL.md
+    └── deployment/SKILL.md
+```
+
+Claude Code only discovers skills at the **top level** of `.claude/skills/` — no nested folders — which normally forces everything into one flat pile. `agent-kit sync` removes that constraint: it walks your nested `skills/` recursively and flattens each path into a unique top-level name.
+
+```
+.claude/skills/
+  backend-auth/
+  backend-jobs/
+  frontend-forms/
+  deployment/
+```
+
+You keep a tidy, human-readable source tree; Claude gets the flat layout it requires. A directory containing a `SKILL.md` *is* a skill, and its path is its identity — no manifest, no registration.
 
 ### Destination layout
 

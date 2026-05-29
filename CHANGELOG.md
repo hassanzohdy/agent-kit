@@ -4,6 +4,14 @@ All notable changes to `@mongez/agent-kit` are documented here. The format follo
 
 ---
 
+## [1.0.22]
+
+### Changed
+
+- **Docs now foreground organizing your *own* project's skills.** The README, bundled skills (`overview`, `authoring-skills`), and `llms`/`llms-full` files now lead with the everyday case: keep a single nested `skills/` folder at your project root (`skills/backend/auth/SKILL.md`) and `agent-kit sync` flattens it into the top-level `.claude/skills/` layout Claude Code requires. Shipping skills from an npm package is now framed as the same mechanism applied to `node_modules/`. No code/API changes.
+
+---
+
 ## [1.0.21]
 
 ### Fixed
