@@ -4,6 +4,14 @@ All notable changes to `@mongez/agent-kit` are documented here. The format follo
 
 ---
 
+## [1.0.23]
+
+### Fixed
+
+- **Correct repository ownership in links.** `agent-kit` lives at [`hassanzohdy/agent-kit`](https://github.com/hassanzohdy/agent-kit), not `warlockjs/agent-kit`. Fixed the stale repo URLs in `llms.txt` and, more importantly, in the starter `AGENTS.md` that `agent-kit init` scaffolds (it was baking the wrong link into every consumer's file). Replaced the internal `warlockjs/warlock` design-spec link with the public docs site.
+
+---
+
 ## [1.0.22]
 
 ### Changed

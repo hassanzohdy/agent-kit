@@ -10,7 +10,7 @@ const STARTER_AGENTS_MD = `# AGENTS.md
 > This file is the single source of truth for instructions given to AI coding
 > agents working in this repository. Tool-specific files (\`CLAUDE.md\`,
 > \`.gemini/GEMINI.md\`, \`.github/copilot-instructions.md\`, \`CONVENTIONS.md\`)
-> are derived from this file by [agent-kit](https://github.com/warlockjs/agent-kit).
+> are derived from this file by [agent-kit](https://github.com/hassanzohdy/agent-kit).
 
 ## Project overview
 

@@ -6,18 +6,18 @@ The AI coding agent landscape fragmented into a dozen tool-specific config files
 
 ## Docs
 
-- [README](https://github.com/warlockjs/agent-kit/blob/main/README.md): Install, quick start, derivation targets, CLI reference, programmatic API
-- [Design spec](https://github.com/warlockjs/warlock/blob/main/domains/agent-kit/design/agent-kit.md): Scope decisions, primitive structure, naming/collision rules, deferred items
+- [README](https://github.com/hassanzohdy/agent-kit/blob/main/README.md): Install, quick start, derivation targets, CLI reference, programmatic API
+- [Documentation](https://mongez.js.org/agent-kit/overview/): Full docs — overview, agent integrations, CLI usage, authoring skills, recipes
 
 ## Skills
 
-- [Overview](https://github.com/warlockjs/agent-kit/blob/main/skills/overview/SKILL.md): What agent-kit is, mental model, key principles, when to use vs not use
+- [Overview](https://github.com/hassanzohdy/agent-kit/blob/main/skills/overview/SKILL.md): What agent-kit is, mental model, key principles, when to use vs not use
   - *Auto-trigger:* Project has `AGENTS.md`/`CLAUDE.md` or `.claude/skills/<pkg>-*` folders, or user asks what agent-kit is or how skill distribution works.
-- [CLI usage](https://github.com/warlockjs/agent-kit/blob/main/skills/cli-usage/SKILL.md): Exact commands and flags for `init` / `sync` / `watch` (including `--path`, `--override`, `--target`), plus the programmatic API
+- [CLI usage](https://github.com/hassanzohdy/agent-kit/blob/main/skills/cli-usage/SKILL.md): Exact commands and flags for `init` / `sync` / `watch` (including `--path`, `--override`, `--target`), plus the programmatic API
   - *Auto-trigger:* User invokes `agent-kit init`/`sync`/`watch`, wires `postinstall`, hits a flag, or imports `deriveAll`/`syncSkills` from `@mongez/agent-kit`.
-- [Authoring skills](https://github.com/warlockjs/agent-kit/blob/main/skills/authoring-skills/SKILL.md): How to lay out skills — both your project's own skills in a single nested `skills/` folder at the project root (flattened into `.claude/skills/` on sync), and reusable skills shipped from an npm package. Covers nested category organization, auto-discovery, flat destination naming, and the front-door convention.
+- [Authoring skills](https://github.com/hassanzohdy/agent-kit/blob/main/skills/authoring-skills/SKILL.md): How to lay out skills — both your project's own skills in a single nested `skills/` folder at the project root (flattened into `.claude/skills/` on sync), and reusable skills shipped from an npm package. Covers nested category organization, auto-discovery, flat destination naming, and the front-door convention.
   - *Auto-trigger:* User is organizing their project's own `skills/` folder (nested category subfolders) or editing a `skills/**/SKILL.md` inside a publishable package, or asks how to structure/ship skills.
 
 ## Optional
 
-- [llms-full.txt](https://github.com/warlockjs/agent-kit/blob/main/llms-full.txt): Full content of README + skills concatenated for one-shot ingestion
+- [llms-full.txt](https://github.com/hassanzohdy/agent-kit/blob/main/llms-full.txt): Full content of README + skills concatenated for one-shot ingestion
