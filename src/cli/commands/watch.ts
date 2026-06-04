@@ -1,21 +1,31 @@
+import { stat } from "node:fs/promises";
 import { defineCommand } from "citty";
 import chokidar from "chokidar";
-import { resolve } from "pathe";
+import { isAbsolute, resolve } from "pathe";
+import { loadAgentKitConfig } from "../../config/agent-kit-config";
 import { deriveAll } from "../../derive/derive";
+import { resolveMonorepoProjects } from "../../monorepo/resolve-projects";
+import { scanForSkillPackages } from "../../skills/scan-skills";
 import { syncSkills } from "../../skills/sync-skills";
 import { logger } from "../../utils/logger";
 import { findProjectRoot } from "../../utils/project-root";
 
-const DEPS_SKILLS_GLOB = "node_modules/**/skills/**/SKILL.md";
-const LOCAL_SKILLS_GLOB = "skills/**/SKILL.md";
 const DEBOUNCE_MS = 150;
 
 /**
  * \`agent-kit watch\` — keep derived files and exported skills up to date while
- * editing AGENTS.md or any locally-linked package's skill files.
+ * editing AGENTS.md or any locally-edited skill files.
  *
  * Intended for monorepo / path-linked dev loops where postinstall does not
  * re-fire on every change.
+ *
+ * We watch concrete **directories**, not globs: chokidar v4+ dropped glob
+ * support, so a pattern like `skills/**\/SKILL.md` would be treated as a literal
+ * path and silently match nothing. Instead we resolve the real skill-source
+ * directories up front (root `skills/`, each `--path` package's `skills/`, and
+ * each `--projects` project's `skills/` + `package.json`) and watch those
+ * recursively. `node_modules/` dependency skills are intentionally not watched
+ * — they only change on (re)install, which fires `postinstall` → `sync`.
  */
 export const watchCommand = defineCommand({
   meta: {
@@ -34,6 +44,11 @@ export const watchCommand = defineCommand({
       description:
         "Comma-separated extra dirs to scan + watch (each treated like a node_modules/). Example: --path @warlock.js",
     },
+    projects: {
+      type: "string",
+      description:
+        "Comma-separated monorepo project dirs (or one-level globs like apps/*) to aggregate + watch. Example: --projects backend,frontend",
+    },
     override: {
       type: "boolean",
       description:
@@ -50,40 +65,35 @@ export const watchCommand = defineCommand({
     }
 
     const scanPaths = parseCsvList(args.path);
+    const projects = parseCsvList(args.projects);
     const override = Boolean(args.override);
 
     // First pass so the working tree is consistent before we start listening.
-    await runFullSync(root, scanPaths, override);
+    await runFullSync(root, scanPaths, projects, override);
 
-    const agentsPath = resolve(root, "AGENTS.md");
-    const watchTargets = [
-      agentsPath,
-      resolve(root, LOCAL_SKILLS_GLOB),
-      resolve(root, DEPS_SKILLS_GLOB),
-      ...(scanPaths ?? []).map((p) =>
-        resolve(root, p, "**/skills/**/SKILL.md"),
-      ),
-    ];
+    const watchTargets = await collectWatchTargets(root, scanPaths, projects);
 
-    logger.info(`Watching: AGENTS.md + ${watchTargets.length - 1} skill glob(s)`);
+    logger.info(
+      `Watching ${watchTargets.length} path(s): AGENTS.md + skill dirs`,
+    );
     if (scanPaths && scanPaths.length > 0) {
       logger.info(`Extra scan paths: ${scanPaths.join(", ")}`);
+    }
+    if (projects && projects.length > 0) {
+      logger.info(`Monorepo projects: ${projects.join(", ")}`);
     }
     logger.info(
       "Claude Code picks up changes on the next prompt. Other agents may need a window/session reload after each re-sync.",
     );
 
-    const watcher = chokidar.watch(watchTargets, {
-      ignoreInitial: true,
-      cwd: root,
-    });
+    const watcher = chokidar.watch(watchTargets, { ignoreInitial: true });
 
     let timer: NodeJS.Timeout | null = null;
     const scheduleSync = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         timer = null;
-        runFullSync(root, scanPaths, override).catch((error) => {
+        runFullSync(root, scanPaths, projects, override).catch((error) => {
           logger.error(error);
         });
       }, DEBOUNCE_MS);
@@ -98,6 +108,7 @@ export const watchCommand = defineCommand({
 async function runFullSync(
   root: string,
   scanPaths: string[] | undefined,
+  projects: string[] | undefined,
   override: boolean,
 ): Promise<void> {
   const derived = await deriveAll({ root });
@@ -105,7 +116,7 @@ async function runFullSync(
   if (changedCount > 0) {
     logger.success(`Re-derived ${changedCount} file(s)`);
   }
-  const skills = await syncSkills({ root, scanPaths, override });
+  const skills = await syncSkills({ root, scanPaths, projects, override });
   logger.success(
     `Re-synced ${skills.exported} skill(s) from ${skills.packages.length} package(s) to ${skills.targets.join(", ")}`,
   );
@@ -113,6 +124,57 @@ async function runFullSync(
     logger.info(
       `Skipped ${skills.skipped} user-authored folder(s). Pass --override to replace them.`,
     );
+  }
+}
+
+/**
+ * Resolve the concrete set of files/dirs to watch. Returns absolute paths that
+ * exist on disk (chokidar fires reliably on existing targets); newly-created
+ * top-level skill folders are picked up on the next `watch` restart.
+ */
+async function collectWatchTargets(
+  root: string,
+  scanPaths: string[] | undefined,
+  projects: string[] | undefined,
+): Promise<string[]> {
+  const targets = new Set<string>();
+
+  // AGENTS.md is always watched (added even if missing so its creation fires).
+  targets.add(resolve(root, "AGENTS.md"));
+
+  // Root authored skills.
+  await addIfExists(targets, resolve(root, "skills"));
+
+  // Each --path scan root: watch the `skills/` of every package it ships, so
+  // a locally-linked dev package's skill edits re-sync live.
+  for (const userPath of scanPaths ?? []) {
+    const abs = isAbsolute(userPath) ? userPath : resolve(root, userPath);
+    const packages = await scanForSkillPackages(abs);
+    for (const pkg of packages) {
+      await addIfExists(targets, resolve(pkg.pkgDir, "skills"));
+    }
+  }
+
+  // Each monorepo project: watch its authored `skills/` and its `package.json`
+  // (so config edits — pick/omit changes — re-sync too). Patterns come from
+  // the flag or, when absent, from the root config.
+  const config = await loadAgentKitConfig(root);
+  const patterns = projects ?? config?.monorepo?.projects;
+  const resolvedProjects = await resolveMonorepoProjects(root, patterns);
+  for (const project of resolvedProjects) {
+    await addIfExists(targets, resolve(project.dir, "skills"));
+    await addIfExists(targets, resolve(project.dir, "package.json"));
+  }
+
+  return [...targets];
+}
+
+async function addIfExists(set: Set<string>, path: string): Promise<void> {
+  try {
+    await stat(path);
+    set.add(path);
+  } catch {
+    // Missing — don't watch a non-existent path.
   }
 }
 

@@ -96,13 +96,20 @@ export type SyncSkillsOptions = {
    * synced version anyway. Use with care.
    */
   override?: boolean;
-};
-
-/**
- * Result of a full sync run.
- */
-export type SyncResult = {
-  derived: DeriveResult[];
-  skillsExported: number;
-  skillTargets: SkillsTargetName[];
+  /**
+   * Monorepo project roots to aggregate into this project's skill dirs. Each
+   * entry is a path relative to `root` (or absolute), and may be a one-level
+   * glob (`apps/*`). Every resolved project is scanned *as its own project* —
+   * its `node_modules/` dependency skills (filtered by that project's own
+   * `agentKit` config) plus its authored `skills/` (prefixed with the project
+   * directory name) — and merged up into `root`'s skill directories.
+   *
+   * Distinct from {@link scanPaths}: a `scanPath` is treated like a
+   * `node_modules/` (its children are packages); a `project` is treated as a
+   * single project (its own `skills/` + its own `node_modules/`).
+   *
+   * Defaults to `agentKit.monorepo.projects` from `root`'s `package.json` when
+   * omitted.
+   */
+  projects?: string[];
 };

@@ -283,4 +283,51 @@ describe("loadAgentKitConfig", () => {
       expect(result?.pick).toBeUndefined();
     });
   });
+
+  describe("monorepo.projects", () => {
+    it("loads a string[] of project patterns", async () => {
+      await writeFile(
+        resolve(tempRoot, "package.json"),
+        JSON.stringify({
+          name: "my-app",
+          agentKit: { monorepo: { projects: ["backend", "frontend"] } },
+        }),
+        "utf8",
+      );
+
+      const result = await loadAgentKitConfig(tempRoot);
+
+      expect(result?.monorepo).toEqual({ projects: ["backend", "frontend"] });
+    });
+
+    it("drops non-string project entries", async () => {
+      await writeFile(
+        resolve(tempRoot, "package.json"),
+        JSON.stringify({
+          name: "my-app",
+          agentKit: { monorepo: { projects: ["backend", 1, null, "apps/*"] } },
+        }),
+        "utf8",
+      );
+
+      const result = await loadAgentKitConfig(tempRoot);
+
+      expect(result?.monorepo).toEqual({ projects: ["backend", "apps/*"] });
+    });
+
+    it("leaves monorepo unset when projects is missing or malformed", async () => {
+      await writeFile(
+        resolve(tempRoot, "package.json"),
+        JSON.stringify({
+          name: "my-app",
+          agentKit: { monorepo: { projects: "not-an-array" } },
+        }),
+        "utf8",
+      );
+
+      const result = await loadAgentKitConfig(tempRoot);
+
+      expect(result?.monorepo).toBeUndefined();
+    });
+  });
 });

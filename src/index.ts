@@ -51,6 +51,11 @@ export {
   deriveSlugForSkill,
   slugifyPackageName,
 } from "./skills/resolve-flat-name";
+export { applyOmitFilter, applyPickFilter } from "./skills/filters";
+export { resolveMonorepoProjects } from "./monorepo/resolve-projects";
+export type { ResolvedProject } from "./monorepo/resolve-projects";
+export { scanProject, scanProjects } from "./monorepo/scan-project";
+export type { ProjectScanResult } from "./monorepo/scan-project";
 export {
   MANAGED_SENTINEL,
   SKILLS_TARGET_PATHS,
@@ -66,6 +71,5 @@ export type {
   DeriveTarget,
   DeriveTargetName,
   SkillsTargetName,
-  SyncResult,
   SyncSkillsOptions,
 } from "./types";

@@ -18,6 +18,9 @@ import { readTextFile } from "../utils/file-io";
  *     },
  *     "omit": {
  *       "@warlock.js/core": ["add-connector"]
+ *     },
+ *     "monorepo": {
+ *       "projects": ["backend", "frontend"]
  *     }
  *   }
  * }
@@ -59,6 +62,32 @@ export type AgentKitConfig = {
    * Runs AFTER {@link pick} when both are set.
    */
   omit?: Record<string, true | string[]>;
+  /**
+   * Monorepo aggregation. When `projects` is set, `agent-kit sync` (run at the
+   * repo root) also scans each listed project *as its own project* and merges
+   * the results up into the root's skill directories:
+   *
+   * - Each project's `node_modules/` dependency skills are filtered by **that
+   *   project's own** `agentKit.pick`/`omit` (read from its `package.json`).
+   * - Each project's authored `skills/` folder is exported with the **project
+   *   directory name** as the slug prefix (`backend/skills/code-standards` →
+   *   `backend-code-standards`), so two projects can ship a same-named skill
+   *   without colliding.
+   *
+   * Entries are paths relative to the repo root (or absolute), and may be a
+   * one-level glob — `apps/*` expands to every immediate subdirectory of
+   * `apps/`. Shared dependencies across projects are deduped to one copy
+   * (skill content is the same documentation regardless of which project
+   * pulled it in); the root's own `agentKit.omit` applies as a final global
+   * veto over everything aggregated.
+   *
+   * `targets` and `monorepo` from a *project's* config are ignored during
+   * aggregation — only its `pick`/`omit` matter. Aggregation does not recurse:
+   * a project's own `monorepo.projects` is not followed.
+   */
+  monorepo?: {
+    projects?: string[];
+  };
 };
 
 /** Sentinel value distinguishing "config field missing" from "field is null". */
@@ -125,7 +154,27 @@ function normalizeAgentKitConfig(raw: Record<string, unknown>): AgentKitConfig {
   const omit = normalizePackageRuleMap(raw.omit);
   if (omit !== null) config.omit = omit;
 
+  const monorepo = normalizeMonorepo(raw.monorepo);
+  if (monorepo !== null) config.monorepo = monorepo;
+
   return config;
+}
+
+/**
+ * Validate the `agentKit.monorepo` block. Currently the only field is
+ * `projects` (a `string[]` of project paths / one-level globs). Non-string
+ * entries are dropped; a missing or malformed block yields `null` so the
+ * property stays unset on the result.
+ */
+function normalizeMonorepo(
+  raw: unknown,
+): AgentKitConfig["monorepo"] | null {
+  if (!isRecord(raw)) return null;
+  if (!Array.isArray(raw.projects)) return null;
+  const projects = raw.projects.filter(
+    (entry): entry is string => typeof entry === "string" && entry.length > 0,
+  );
+  return { projects };
 }
 
 /**

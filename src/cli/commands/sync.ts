@@ -43,6 +43,11 @@ export const syncCommand = defineCommand({
       description:
         "Comma-separated extra dirs to scan (each treated like a node_modules/). Useful for monorepos and local dev. Example: --path @warlock.js",
     },
+    projects: {
+      type: "string",
+      description:
+        "Comma-separated monorepo project dirs (or one-level globs like apps/*) to aggregate. Each is scanned as its own project — its node_modules (filtered by its own agentKit config) + its authored skills/, prefixed with the project dir name. Example: --projects backend,frontend",
+    },
     override: {
       type: "boolean",
       description:
@@ -71,15 +76,22 @@ export const syncCommand = defineCommand({
     if (!args["derive-only"]) {
       const targets = parseSkillTargets(args.target);
       const scanPaths = parseCsvList(args.path);
+      const projects = parseCsvList(args.projects);
       const result = await syncSkills({
         root,
         targets,
         scanPaths,
+        projects,
         override: Boolean(args.override),
       });
       logger.success(
         `Exported ${result.exported} skill(s) from ${result.packages.length} package(s) to: ${result.targets.join(", ")}`,
       );
+      if (result.projects.length > 0) {
+        logger.info(
+          `Aggregated ${result.projects.length} project(s): ${result.projects.join(", ")}`,
+        );
+      }
       if (result.exported > 0) {
         logger.info(
           "Claude Code picks up new skills on the next prompt. Other agents (Cursor, Copilot, Codex, Gemini, Kiro, Antigravity) may need a window or session reload.",
