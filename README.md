@@ -67,13 +67,24 @@ pnpm add -D @mongez/agent-kit
 
 ## Quick start
 
-Bootstrap a project from scratch with one command.
+Bootstrap a project from scratch with one command — no install needed:
 
 ```sh
-npx agent-kit init
+npx @mongez/agent-kit@latest init
 ```
 
-This writes a starter `AGENTS.md` at the project root (only if one does not already exist) and derives every per-tool file from it — `CLAUDE.md`, `.gemini/GEMINI.md`, `.github/copilot-instructions.md`, `CONVENTIONS.md`. Then keep them in sync after every install:
+This runs the latest published agent-kit on the fly (nothing added to your
+`node_modules`) and writes a starter `AGENTS.md` at the project root (only if one
+does not already exist), then derives every per-tool file from it — `CLAUDE.md`,
+`.gemini/GEMINI.md`, `.github/copilot-instructions.md`, `CONVENTIONS.md`.
+
+> **Use the scoped name with `npx`.** `npx @mongez/agent-kit …` resolves *this*
+> package. `npx agent-kit …` (unscoped) would try to fetch a different package —
+> the bare `agent-kit` binary name only works once it's installed locally (below).
+
+For the **recurring** sync, install agent-kit as a dev dependency and wire it into
+`postinstall` so every `install` re-derives the per-tool files and re-mirrors
+skills — pinned and reproducible across the team and CI:
 
 ```json
 {
@@ -82,6 +93,13 @@ This writes a starter `AGENTS.md` at the project root (only if one does not alre
   }
 }
 ```
+
+**`init` vs `sync` — different delivery on purpose:** `init` is a one-time
+scaffold, so the always-latest `npx @mongez/agent-kit@latest init` is ideal.
+`sync` runs on every install (and in CI), so it belongs as a **pinned dev
+dependency** — never always-latest, or a new agent-kit version could silently
+change generated output. (Ad-hoc manual `npx @mongez/agent-kit@latest sync` is
+fine.)
 
 From now on, every `yarn install` re-derives the per-tool files from `AGENTS.md` and mirrors skills from installed packages into `.claude/skills/`. Edit `AGENTS.md`, run `npx agent-kit sync`, and every supported agent picks up the change.
 

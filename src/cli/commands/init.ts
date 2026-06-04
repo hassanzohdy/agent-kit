@@ -16,6 +16,16 @@ const STARTER_AGENTS_MD = `# AGENTS.md
 
 Describe what this project does and any context an agent needs to be useful.
 
+## Skills
+
+This project's dependencies may ship skills — focused, task-specific guides your
+AI coding agent loads on demand (Claude Code, Cursor, Codex, Copilot, Gemini, and
+others each read them from their own skills directory). Before searching the
+codebase for examples, reading a package's source/types/README, or inferring an
+API by hand, **first check the available skills and load any that match the
+package or task**. Skills are the source of truth for how to use a package —
+consult them before reverse-engineering usage from code.
+
 ## Commands
 
 - \`yarn dev\` — start the dev server

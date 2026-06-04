@@ -1,6 +1,6 @@
 {
   "name": "@mongez/agent-kit",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Authoring and distribution toolkit for AI coding agent artifacts: AGENTS.md derivation, skills sync, and multi-agent config scaffolding.",
   "type": "module",
   "main": "./cjs/index.js",
