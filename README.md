@@ -76,7 +76,10 @@ npx @mongez/agent-kit@latest init
 This runs the latest published agent-kit on the fly (nothing added to your
 `node_modules`) and writes a starter `AGENTS.md` at the project root (only if one
 does not already exist), then derives every per-tool file from it — `CLAUDE.md`,
-`.gemini/GEMINI.md`, `.github/copilot-instructions.md`, `CONVENTIONS.md`.
+`.gemini/GEMINI.md`, `.github/copilot-instructions.md`, `CONVENTIONS.md` — and
+seeds `agentKit: { "targets": ["claude"] }` into `package.json` so the default
+skill targets are explicit and editable (pass `--target claude,cursor` to pick
+your own).
 
 > **Use the scoped name with `npx`.** `npx @mongez/agent-kit …` resolves *this*
 > package. `npx agent-kit …` (unscoped) would try to fetch a different package —
@@ -152,11 +155,16 @@ Three commands. All accept `--cwd <path>` to override the working directory, and
 
 ### `agent-kit init`
 
-Scaffold `AGENTS.md` (only when missing — never clobbers an existing file) and derive every per-tool file.
+Scaffold `AGENTS.md` (only when missing — never clobbers an existing file), derive every per-tool file, and seed `agentKit.targets` in `package.json`.
 
 ```sh
-npx agent-kit init
+npx agent-kit init                        # seeds agentKit.targets = ["claude"]
+npx agent-kit init --target claude,cursor # seed a custom target list
 ```
+
+`--target` writes the chosen skill targets into `package.json`'s `agentKit.targets` (the same field the docs describe under [project-level config](#project-level-config-agentkit-in-packagejson)) — making the otherwise-implicit `["claude"]` default visible and editable. It's non-clobbering: an `agentKit.targets` you already set is only replaced when you pass `--target`. Since `targets` gates only the skills export, the seeded value first takes effect on the next `agent-kit sync`.
+
+`init` also **wires `"postinstall": "agent-kit sync"`** for you — but only when it's safe to: `@mongez/agent-kit` must already be a `dependency`/`devDependency` (so the `agent-kit` binary actually resolves at install time) and there must be no existing `postinstall` (yours is never clobbered). The zero-install `npx @mongez/agent-kit@latest init` path therefore *doesn't* write a postinstall — it has nothing in `node_modules` to run it — so `init` prints a hint to install agent-kit and add the script instead.
 
 ### `agent-kit sync`
 

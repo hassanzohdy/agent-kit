@@ -1,6 +1,11 @@
 import { defineCommand } from "citty";
 import { resolve } from "pathe";
+import {
+  ensureAgentKitTargets,
+  ensurePostinstallScript,
+} from "../../config/init-package-json";
 import { deriveAll } from "../../derive/derive";
+import type { SkillsTargetName } from "../../types";
 import { readTextFile, writeTextFile } from "../../utils/file-io";
 import { logger } from "../../utils/logger";
 import { findProjectRoot } from "../../utils/project-root";
@@ -42,22 +47,30 @@ What agents should and should not do without checking first.
 `;
 
 /**
- * \`agent-kit init\` — scaffold a starter \`AGENTS.md\` (only if missing) and
- * generate all derived files from it.
+ * \`agent-kit init\` — scaffold a starter \`AGENTS.md\` (only if missing),
+ * generate all derived files from it, and seed \`agentKit.targets\` in
+ * \`package.json\`.
  *
  * If \`AGENTS.md\` already exists, it is left untouched. This is intentional —
- * the source file is the user's truth and init never clobbers it.
+ * the source file is the user's truth and init never clobbers it. The same
+ * non-clobbering rule applies to an existing \`agentKit.targets\`: a value the
+ * user already chose is only replaced when \`--target\` is passed explicitly.
  */
 export const initCommand = defineCommand({
   meta: {
     name: "init",
     description:
-      "Scaffold AGENTS.md (if missing) and generate derived files for each AI agent.",
+      "Scaffold AGENTS.md (if missing), derive per-agent files, and seed agentKit.targets in package.json.",
   },
   args: {
     cwd: {
       type: "string",
       description: "Working directory (defaults to process.cwd())",
+    },
+    target: {
+      type: "string",
+      description:
+        "Comma-separated skill targets to write into package.json's agentKit.targets (claude,copilot,cursor,codex,opencode,amp,goose,kiro,antigravity). Defaults to claude. Passing this overwrites an existing agentKit.targets.",
     },
   },
   async run({ args }) {
@@ -79,8 +92,78 @@ export const initCommand = defineCommand({
         .map((r) => r.target)
         .join(", ")}`,
     );
+
+    const explicitTargets = parseTargets(args.target);
+    const seed = await ensureAgentKitTargets({
+      root,
+      targets: explicitTargets ?? ["claude"],
+      overwrite: explicitTargets !== undefined,
+    });
+    logTargetsResult(seed.action, seed.targets);
+
+    const postinstall = await ensurePostinstallScript({ root });
+    logPostinstallResult(postinstall);
   },
 });
+
+/**
+ * Parse the \`--target\` CSV into a target list, or \`undefined\` when the flag
+ * was omitted (so the caller can fall back to the default without overwriting).
+ * Validation of the names happens in {@link ensureAgentKitTargets}.
+ */
+function parseTargets(raw: string | undefined): SkillsTargetName[] | undefined {
+  if (!raw) return undefined;
+  const entries = raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean) as SkillsTargetName[];
+  return entries.length > 0 ? entries : undefined;
+}
+
+function logTargetsResult(
+  action: Awaited<ReturnType<typeof ensureAgentKitTargets>>["action"],
+  targets: SkillsTargetName[],
+): void {
+  const list = targets.join(", ");
+  switch (action) {
+    case "created":
+    case "added":
+      logger.success(`Seeded agentKit.targets = [${list}] in package.json`);
+      break;
+    case "updated":
+      logger.success(`Updated agentKit.targets = [${list}] in package.json`);
+      break;
+    case "unchanged":
+      logger.info(
+        `agentKit.targets already set ([${list}]) — leaving it alone (pass --target to overwrite)`,
+      );
+      break;
+  }
+}
+
+function logPostinstallResult(
+  result: Awaited<ReturnType<typeof ensurePostinstallScript>>,
+): void {
+  switch (result.action) {
+    case "wired":
+      logger.success(
+        `Wired "postinstall": "${result.command}" in package.json — skills + derived files now refresh on every install`,
+      );
+      break;
+    case "skipped-existing":
+      logger.info(
+        `package.json already has a postinstall script ("${result.command}") — leaving it alone`,
+      );
+      break;
+    case "skipped-not-a-dep":
+      logger.info(
+        'Tip: install @mongez/agent-kit as a dev dependency and add "postinstall": "agent-kit sync" so skills + derived files refresh on every install.',
+      );
+      break;
+    case "unchanged":
+      break;
+  }
+}
 
 async function resolveRoot(cwdArg: string | undefined): Promise<string> {
   const startDir = cwdArg ? resolve(cwdArg) : process.cwd();
