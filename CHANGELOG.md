@@ -4,6 +4,15 @@ All notable changes to `@mongez/agent-kit` are documented here. The format follo
 
 ---
 
+## [1.2.1] — 2026-08-17
+
+### Fixed
+
+- **`sync` no longer follows a symlink that resolves outside the package it is reading skills from** (`src/skills/sync-skills.ts`). Skill sources are walked from `node_modules`, i.e. from code the consumer installed but did not write — a dependency could ship `skills/` (or an entry beneath it) as a symlink to `~/.ssh`, `/etc`, or a sibling package, and `sync` would copy the target's contents into the consumer's agent directories. That is a supply-chain path with an unusually quiet payoff: the exfiltrated content lands in files an AI agent is *designed* to read and act on. Any entry whose real path falls outside the package root is now skipped.
+- **Depth cap on the `skills/` walk** (`src/skills/scan-skills.ts:181`). The recursive scan had no bound, so a symlink cycle or a pathologically nested tree in an installed package hung the CLI (and therefore any `postinstall` that runs it). Recursion now stops at a fixed nesting depth; real skill layouts are far below it.
+
+---
+
 ## [1.2.0] — 2026-06-06
 
 ### Added

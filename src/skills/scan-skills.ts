@@ -178,6 +178,15 @@ export async function autoDiscoverSkills(
 }
 
 /**
+ * Hard cap on nesting depth walked under `skills/`. Guards against a
+ * malicious/compromised package shipping a pathologically deep directory
+ * tree (`skills/a/a/a/.../a/`) that would otherwise exhaust the call stack
+ * and crash the unattended `postinstall` sync. Far deeper than any
+ * legitimate skill layout would ever need.
+ */
+const MAX_SKILL_WALK_DEPTH = 32;
+
+/**
  * Recursively walk a directory tree looking for `SKILL.md` files.
  *
  * A directory containing `SKILL.md` is a skill leaf — we record it and stop
@@ -218,7 +227,9 @@ async function walkForNestedSkills(
     ];
   }
 
-  // Not a leaf: keep walking into subdirectories
+  // Not a leaf: keep walking into subdirectories, up to the depth cap.
+  if (segments.length >= MAX_SKILL_WALK_DEPTH) return [];
+
   const found: SkillEntry[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;

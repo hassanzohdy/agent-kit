@@ -417,6 +417,39 @@ describe("autoDiscoverSkills", () => {
       expect(result[0]?.path).toBe("./skills/a/b/c/deep-skill");
     });
 
+    it(
+      "stops walking past the depth cap instead of recursing forever",
+      async () => {
+        // 35 levels deep — beyond MAX_SKILL_WALK_DEPTH (32) — with no
+        // SKILL.md anywhere. A malicious package could ship a tree like this
+        // to try to exhaust the call stack; the walk should bail out cleanly.
+        const segments = Array.from({ length: 35 }, (_, i) => `level-${i}`);
+        const deepDir = resolve(tempRoot, "skills", ...segments);
+        await mkdir(deepDir, { recursive: true });
+        await writeFile(resolve(deepDir, "marker.txt"), "no skill here", "utf8");
+
+        const result = await autoDiscoverSkills(tempRoot, "pkg");
+
+        expect(result).toEqual([]);
+      },
+      20000,
+    );
+
+    it(
+      "still discovers a skill within the depth cap even when a sibling branch is deeper",
+      async () => {
+        await writeNestedSkillMd(tempRoot, "backend/auth");
+        const segments = Array.from({ length: 35 }, (_, i) => `level-${i}`);
+        const deepDir = resolve(tempRoot, "skills", ...segments);
+        await mkdir(deepDir, { recursive: true });
+
+        const result = await autoDiscoverSkills(tempRoot, "pkg");
+
+        expect(result.map((s) => s.name)).toEqual(["backend/auth"]);
+      },
+      20000,
+    );
+
     it("mixes flat and nested skills in the same scan", async () => {
       await writeSkillMd(tempRoot, "flat-skill");
       await writeNestedSkillMd(tempRoot, "backend/auth");

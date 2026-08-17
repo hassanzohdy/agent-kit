@@ -1,4 +1,12 @@
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "pathe";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -352,6 +360,106 @@ describe("syncSkills", () => {
     await expect(
       syncSkills({ root: tempRoot, targets: ["claude"] }),
     ).rejects.toThrow(/destination collision/);
+  });
+
+  it("skips a skill whose entire skills/ dir is a symlink pointing outside the package", async () => {
+    // Secret directory living outside node_modules entirely — the attack target.
+    const secretDir = resolve(tempRoot, "outside-package");
+    await mkdir(secretDir, { recursive: true });
+    await writeFile(resolve(secretDir, "SKILL.md"), "# leaked secret", "utf8");
+
+    // Malicious package ships `skills/` itself as a symlink escaping the
+    // package directory instead of a real folder (single-skill/root layout).
+    const pkgDir = resolve(nodeModules, "evil");
+    await mkdir(pkgDir, { recursive: true });
+    await writeFile(
+      resolve(pkgDir, "package.json"),
+      JSON.stringify({ name: "evil" }),
+      "utf8",
+    );
+    await symlink(secretDir, resolve(pkgDir, "skills"), "dir");
+
+    const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
+
+    expect(result.skipped).toBe(1);
+    expect(result.exported).toBe(0);
+    expect(
+      await fileExists(resolve(tempRoot, ".claude/skills/evil/SKILL.md")),
+    ).toBe(false);
+    // Nothing outside the package should have leaked into any managed dir.
+    expect(
+      await fileExists(
+        resolve(tempRoot, ".claude/skills/outside-package/SKILL.md"),
+      ),
+    ).toBe(false);
+  });
+
+  it("skips a skill that contains a nested symlink escaping the package", async () => {
+    const secretFile = resolve(tempRoot, "secret.txt");
+    await writeFile(secretFile, "top secret contents", "utf8");
+
+    await installFakePackage(nodeModules, "sneaky", [
+      { name: "agent", body: "# looks legit" },
+    ]);
+    // Plant a symlink *inside* an otherwise-normal skill folder, pointing at
+    // a file outside the package. fs.cp would otherwise recreate this
+    // symlink verbatim at the destination.
+    await symlink(
+      secretFile,
+      resolve(nodeModules, "sneaky", "skills", "agent", "leak.txt"),
+      "file",
+    );
+
+    const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
+
+    expect(result.skipped).toBe(1);
+    expect(result.exported).toBe(0);
+    expect(
+      await fileExists(
+        resolve(tempRoot, ".claude/skills/sneaky-agent/SKILL.md"),
+      ),
+    ).toBe(false);
+  });
+
+  it("still syncs a skill whose symlink resolves inside the package itself", async () => {
+    await installFakePackage(nodeModules, "internal-link", [
+      { name: "agent", body: "# real content" },
+    ]);
+    const pkgDir = resolve(nodeModules, "internal-link");
+    // A symlink that points at another file within the SAME package is not
+    // a supply-chain escape — it should be treated as safe.
+    await writeFile(resolve(pkgDir, "notes.txt"), "internal notes", "utf8");
+    await symlink(
+      resolve(pkgDir, "notes.txt"),
+      resolve(pkgDir, "skills", "agent", "notes-link.txt"),
+      "file",
+    );
+
+    const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
+
+    expect(result.exported).toBe(1);
+    expect(result.skipped).toBe(0);
+    expect(
+      await fileExists(
+        resolve(tempRoot, ".claude/skills/internal-link-agent/SKILL.md"),
+      ),
+    ).toBe(true);
+  });
+
+  it("still syncs normal skill files with no symlinks involved", async () => {
+    await installFakePackage(nodeModules, "clean", [
+      { name: "agent", body: "# plain skill, no symlinks" },
+    ]);
+
+    const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
+
+    expect(result.exported).toBe(1);
+    expect(result.skipped).toBe(0);
+    const content = await readFile(
+      resolve(tempRoot, ".claude/skills/clean-agent/SKILL.md"),
+      "utf8",
+    );
+    expect(content).toBe("# plain skill, no symlinks");
   });
 });
 
