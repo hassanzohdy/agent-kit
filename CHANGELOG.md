@@ -4,6 +4,14 @@ All notable changes to `@mongez/agent-kit` are documented here. The format follo
 
 ---
 
+## [1.2.2]
+
+### Fixed
+
+- `sync` now rewrites relative Markdown links that cross between flattened exported skill folders, preserving anchors, titles, reference definitions, and same-skill assets.
+
+---
+
 ## [1.2.1] — 2026-08-17
 
 ### Fixed

@@ -477,3 +477,7 @@ For the full API surface in a single LLM-friendly file, see [`llms-full.txt`](./
 ## License
 
 MIT — see [LICENSE](./LICENSE).
+
+## Release build
+
+The package owns its standalone pkgist definition in `pkgist.config.mjs`. Build a local candidate with pkgist's direct CLI, `--config pkgist.config.mjs --no-publish --no-git`; it compiles both `src/index.ts` and `src/cli/index.ts` and copies the CLI bin plus shipped documentation.

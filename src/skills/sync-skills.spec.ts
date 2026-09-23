@@ -44,6 +44,11 @@ async function installFakePackage(
   }
 }
 
+/** Windows permits directory junctions without the symlink privilege. */
+function linkDirectory(target: string, destination: string): Promise<void> {
+  return symlink(target, destination, process.platform === "win32" ? "junction" : "dir");
+}
+
 async function fileExists(p: string): Promise<boolean> {
   try {
     await access(p);
@@ -377,7 +382,7 @@ describe("syncSkills", () => {
       JSON.stringify({ name: "evil" }),
       "utf8",
     );
-    await symlink(secretDir, resolve(pkgDir, "skills"), "dir");
+    await linkDirectory(secretDir, resolve(pkgDir, "skills"));
 
     const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
 
@@ -395,19 +400,19 @@ describe("syncSkills", () => {
   });
 
   it("skips a skill that contains a nested symlink escaping the package", async () => {
-    const secretFile = resolve(tempRoot, "secret.txt");
-    await writeFile(secretFile, "top secret contents", "utf8");
+    const secretDir = resolve(tempRoot, "secret");
+    await mkdir(secretDir, { recursive: true });
+    await writeFile(resolve(secretDir, "contents.txt"), "top secret contents", "utf8");
 
     await installFakePackage(nodeModules, "sneaky", [
       { name: "agent", body: "# looks legit" },
     ]);
     // Plant a symlink *inside* an otherwise-normal skill folder, pointing at
-    // a file outside the package. fs.cp would otherwise recreate this
-    // symlink verbatim at the destination.
-    await symlink(
-      secretFile,
-      resolve(nodeModules, "sneaky", "skills", "agent", "leak.txt"),
-      "file",
+    // a directory outside the package. fs.cp would otherwise recreate this
+    // link verbatim at the destination.
+    await linkDirectory(
+      secretDir,
+      resolve(nodeModules, "sneaky", "skills", "agent", "leak"),
     );
 
     const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
@@ -426,13 +431,13 @@ describe("syncSkills", () => {
       { name: "agent", body: "# real content" },
     ]);
     const pkgDir = resolve(nodeModules, "internal-link");
-    // A symlink that points at another file within the SAME package is not
+    // A directory link that points within the SAME package is not
     // a supply-chain escape — it should be treated as safe.
-    await writeFile(resolve(pkgDir, "notes.txt"), "internal notes", "utf8");
-    await symlink(
-      resolve(pkgDir, "notes.txt"),
-      resolve(pkgDir, "skills", "agent", "notes-link.txt"),
-      "file",
+    await mkdir(resolve(pkgDir, "notes"), { recursive: true });
+    await writeFile(resolve(pkgDir, "notes", "notes.txt"), "internal notes", "utf8");
+    await linkDirectory(
+      resolve(pkgDir, "notes"),
+      resolve(pkgDir, "skills", "agent", "notes-link"),
     );
 
     const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
@@ -927,5 +932,53 @@ describe("syncSkills with scanPaths", () => {
       resolve(tempRoot, "custom-a"),
       resolve(tempRoot, "custom-b"),
     ]);
+  });
+
+  it("rewrites cross-skill Markdown links after flattening for every target", async () => {
+    await installFakePackage(nodeModules, "source", [
+      {
+        name: "alpha",
+        body: [
+          "[sibling](../beta/SKILL.md#part \"Beta skill\")",
+          "[asset](./images/logo.svg)",
+          "[external](https://example.test/docs#top) [anchor](#local) [package](@scope/pkg)",
+          "[ref]: <../beta/SKILL.md#part> \"Beta reference\"",
+          "[escaped](../beta/guide\\ file.md)",
+          "```md",
+          "[code](../beta/SKILL.md)",
+          "```",
+        ].join("\n"),
+      },
+      { name: "beta", body: "# Beta" },
+    ]);
+    const alpha = resolve(nodeModules, "source/skills/alpha");
+    await mkdir(resolve(alpha, "docs"), { recursive: true });
+    await mkdir(resolve(alpha, "images"), { recursive: true });
+    await writeFile(resolve(alpha, "images/logo.svg"), "svg", "utf8");
+    await writeFile(
+      resolve(nodeModules, "source/skills/beta/guide file.md"),
+      "# Guide",
+      "utf8",
+    );
+    await writeFile(
+      resolve(alpha, "docs/guide.md"),
+      "![nested sibling](../../beta/SKILL.md#part)\n[ref]: ../../beta/SKILL.md#part",
+      "utf8",
+    );
+
+    await syncSkills({ root: tempRoot, targets: ["claude", "opencode"] });
+
+    for (const targetRoot of [".claude/skills", ".opencode/skill"]) {
+      const exportedAlpha = resolve(tempRoot, targetRoot, "source-alpha");
+      const skill = await readFile(resolve(exportedAlpha, "SKILL.md"), "utf8");
+      expect(skill).toContain('[sibling](../source-beta/SKILL.md#part "Beta skill")');
+      expect(skill).toContain("[asset](./images/logo.svg)");
+      expect(skill).toContain('[ref]: <../source-beta/SKILL.md#part> "Beta reference"');
+      expect(skill).toContain("[escaped](../source-beta/guide\\ file.md)");
+      expect(skill).toContain("[external](https://example.test/docs#top) [anchor](#local) [package](@scope/pkg)");
+      expect(skill).toContain("[code](../beta/SKILL.md)");
+      expect(await readFile(resolve(exportedAlpha, "docs/guide.md"), "utf8"))
+        .toBe("![nested sibling](../../source-beta/SKILL.md#part)\n[ref]: ../../source-beta/SKILL.md#part");
+    }
   });
 });
