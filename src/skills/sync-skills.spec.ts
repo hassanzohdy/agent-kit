@@ -453,6 +453,33 @@ describe("syncSkills", () => {
     ).toBe(true);
   });
 
+  it("still syncs an internal link when the project is reached through an aliased path", async () => {
+    // CI reaches temp dirs through a Windows 8.3 short name (RUNNER~1); a
+    // junction/symlinked project folder does the same thing everywhere. The
+    // link's real path must be compared against the package's REAL path.
+    await installFakePackage(nodeModules, "internal-link", [
+      { name: "agent", body: "# real content" },
+    ]);
+    const pkgDir = resolve(nodeModules, "internal-link");
+    await mkdir(resolve(pkgDir, "notes"), { recursive: true });
+    await writeFile(resolve(pkgDir, "notes", "notes.txt"), "internal notes", "utf8");
+    await linkDirectory(
+      resolve(pkgDir, "notes"),
+      resolve(pkgDir, "skills", "agent", "notes-link"),
+    );
+    const aliasRoot = `${tempRoot}-alias`;
+    await linkDirectory(tempRoot, aliasRoot);
+
+    try {
+      const result = await syncSkills({ root: aliasRoot, targets: ["claude"] });
+
+      expect(result.exported).toBe(1);
+      expect(result.skipped).toBe(0);
+    } finally {
+      await rm(aliasRoot, { recursive: false, force: true });
+    }
+  });
+
   it("still syncs normal skill files with no symlinks involved", async () => {
     await installFakePackage(nodeModules, "clean", [
       { name: "agent", body: "# plain skill, no symlinks" },

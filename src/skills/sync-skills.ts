@@ -569,13 +569,22 @@ async function exportGroupedPackage(
     await writeFile(topicFile, removeSkillName(source), "utf8");
 
     // Everything except the topic's own SKILL.md (already written above).
-    await cp(topic.sourceDir, assetDir, {
-      recursive: true,
-      dereference: process.platform === "win32",
-      filter: (src) => resolve(src) !== skillFile,
-    });
-    if ((await readdir(assetDir)).length === 0) {
-      await rm(assetDir, { recursive: true, force: true });
+    // Enumerated by name rather than with a `cp` filter: the path form a
+    // filter receives differs across Node versions on Windows, so a path
+    // comparison there silently copied SKILL.md and left empty asset dirs.
+    const assets = (await readdir(topic.sourceDir)).filter(
+      (name) => name !== "SKILL.md",
+    );
+
+    if (assets.length > 0) {
+      await mkdir(assetDir, { recursive: true });
+
+      for (const name of assets) {
+        await cp(resolve(topic.sourceDir, name), resolve(assetDir, name), {
+          recursive: true,
+          dereference: process.platform === "win32",
+        });
+      }
     }
 
     const exportedSkill: ExportedSkill = {
@@ -696,7 +705,13 @@ async function containsUnsafeSymlink(
   if (stats.isSymbolicLink()) {
     try {
       const real = await realpath(entryPath);
-      return !isWithinRoot(real, allowedRoot);
+      // Compare real path to real path: when the project is reached through
+      // an alias (a junction/symlinked folder, or a Windows 8.3 short name
+      // such as C:\Users\RUNNER~1), the target's real path never sits under
+      // the unresolved root, and a link inside the package looked like an
+      // escape.
+      const realRoot = await realpath(allowedRoot).catch(() => allowedRoot);
+      return !isWithinRoot(real, realRoot);
     } catch {
       return true; // Broken/unresolvable symlink — fail closed.
     }
