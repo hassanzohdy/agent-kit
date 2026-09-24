@@ -206,8 +206,8 @@ export async function syncSkills(
         options.layout ??
         config?.layoutOverrides?.[pkg.pkg] ??
         config?.layout ??
-        "grouped";
-      const result = shouldGroup(pkg, layout)
+        "auto";
+      const result = (await shouldGroup(pkg, layout))
         ? await exportGroupedPackage(pkg, targetDir, ctx)
         : await exportPackageSkills(pkg, targetDir, ctx);
       exported += result.exported;
@@ -461,17 +461,27 @@ async function exportPackageSkills(
 
 
 /**
- * A dependency package is grouped when its layout is "grouped" and it has two
- * or more skills. Authored (project / monorepo project) skills and root-layout
- * skills always export flat.
+ * A dependency package is grouped when it has two or more skills and its layout
+ * is "grouped", or "auto" and the package ships `skills/index.md` (its opt-in
+ * router description). Authored (project / monorepo project) skills and
+ * root-layout skills always export flat.
  */
-function shouldGroup(pkg: ScannedSkillPackage, layout: SkillsLayout): boolean {
-  return (
-    layout === "grouped" &&
-    !pkg.authored &&
-    pkg.skills.length >= 2 &&
-    !pkg.skills.some(isRootLayout)
-  );
+async function shouldGroup(
+  pkg: ScannedSkillPackage,
+  layout: SkillsLayout,
+): Promise<boolean> {
+  if (
+    layout === "flat" ||
+    pkg.authored ||
+    pkg.skills.length < 2 ||
+    pkg.skills.some(isRootLayout)
+  ) {
+    return false;
+  }
+
+  if (layout === "grouped") return true;
+
+  return isFile(resolve(pkg.pkgDir, "skills", "index.md"));
 }
 
 type Topic = { name: string; sourceDir: string; description: string };

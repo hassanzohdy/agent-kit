@@ -40,7 +40,13 @@ describe("syncSkills grouped layout", () => {
     root = await mkdtemp(resolve(tmpdir(), "agent-kit-grouped-"));
     nodeModules = resolve(root, "node_modules");
     await mkdir(nodeModules, { recursive: true });
-    await writeFile(resolve(root, "package.json"), "{}", "utf8");
+    // These specs exercise the grouped mechanics, so opt every package in.
+    // The "auto" default is covered in its own block below.
+    await writeFile(
+      resolve(root, "package.json"),
+      JSON.stringify({ agentKit: { layout: "grouped" } }),
+      "utf8",
+    );
   });
 
   afterEach(async () => {
@@ -186,7 +192,9 @@ describe("syncSkills grouped layout", () => {
   it("(j) layoutOverrides can force one package flat", async () => {
     await writeFile(
       resolve(root, "package.json"),
-      JSON.stringify({ agentKit: { layoutOverrides: { foo: "flat" } } }),
+      JSON.stringify({
+        agentKit: { layout: "grouped", layoutOverrides: { foo: "flat" } },
+      }),
       "utf8",
     );
     await writePkg("foo", threeTopics);
@@ -233,5 +241,46 @@ describe("syncSkills grouped layout", () => {
     expect(info).toHaveBeenCalledWith(
       "claude: 2 skills (1 grouped packages), 21 description chars",
     );
+  });
+
+  describe("auto layout (the default)", () => {
+    beforeEach(async () => {
+      await writeFile(resolve(root, "package.json"), "{}", "utf8");
+    });
+
+    it("(m) groups a package that ships skills/index.md", async () => {
+      await writePkg("@warlock.js/cascade", threeTopics, index);
+      await syncSkills({ root, targets: ["claude"] });
+
+      expect(await fileExists(out("warlock-js-cascade", "SKILL.md"))).toBe(true);
+      expect(await fileExists(out("warlock-js-cascade", "alpha.md"))).toBe(true);
+    });
+
+    it("(n) keeps a package without skills/index.md flat and silent", async () => {
+      const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      await writePkg("foo", threeTopics);
+      await syncSkills({ root, targets: ["claude"] });
+
+      expect((await readdir(out())).sort()).toEqual([
+        "foo-alpha",
+        "foo-beta",
+        "foo-gamma",
+      ]);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("(o) mixes grouped and flat packages in one sync", async () => {
+      await writePkg("@warlock.js/cascade", threeTopics, index);
+      await writePkg("foo", threeTopics);
+      const result = await syncSkills({ root, targets: ["claude"] });
+
+      expect((await readdir(out())).sort()).toEqual([
+        "foo-alpha",
+        "foo-beta",
+        "foo-gamma",
+        "warlock-js-cascade",
+      ]);
+      expect(result.summaries[0]?.groupedPackages).toBe(1);
+    });
   });
 });

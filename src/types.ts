@@ -114,7 +114,8 @@ export type SyncSkillsOptions = {
   projects?: string[];
   /**
    * Export layout for every eligible package. Overrides `agentKit.layout` and
-   * `agentKit.layoutOverrides`. Defaults to the config value, then `"grouped"`.
+   * `agentKit.layoutOverrides`. Defaults to the config value, then `"auto"`
+   * (group only packages that ship `skills/index.md`).
    */
-  layout?: "grouped" | "flat";
+  layout?: "auto" | "grouped" | "flat";
 };

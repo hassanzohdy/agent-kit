@@ -96,10 +96,12 @@ export type AgentKitConfig = {
    */
   projectPrefix?: string;
   /**
-   * How a dependency package's skills are exported. `"grouped"` (the default)
-   * writes ONE folder per package with a router `SKILL.md` and one `.md` file
-   * per topic; `"flat"` writes one top-level folder per skill. Only packages
-   * with two or more skills are grouped.
+   * How a dependency package's skills are exported. `"grouped"` writes ONE
+   * folder per package with a router `SKILL.md` and one `.md` file per topic;
+   * `"flat"` writes one top-level folder per skill. `"auto"` (the default)
+   * groups a package only when it opts in by shipping `skills/index.md`, so
+   * packages that never heard of grouping export exactly as before. Only
+   * packages with two or more skills are ever grouped.
    */
   layout?: SkillsLayout;
   /** Per-package {@link layout} override, keyed by exact package name. */
@@ -107,7 +109,7 @@ export type AgentKitConfig = {
 };
 
 /** Skill export layout. See {@link AgentKitConfig.layout}. */
-export type SkillsLayout = "grouped" | "flat";
+export type SkillsLayout = "auto" | "grouped" | "flat";
 
 /** Sentinel value distinguishing "config field missing" from "field is null". */
 type ConfigResolution =
@@ -194,7 +196,7 @@ function normalizeAgentKitConfig(raw: Record<string, unknown>): AgentKitConfig {
 }
 
 function isSkillsLayout(value: unknown): value is SkillsLayout {
-  return value === "grouped" || value === "flat";
+  return value === "auto" || value === "grouped" || value === "flat";
 }
 
 /**
