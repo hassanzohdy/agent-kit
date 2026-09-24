@@ -448,7 +448,7 @@ async function exportPackageSkills(
     await writeFile(resolve(destDir, MANAGED_SENTINEL), "", "utf8");
     await rewriteExportedName(resolve(destDir, "SKILL.md"), flatName);
     ctx.writtenForTarget.set(flatName, { pkg: pkg.pkg, sourceDir });
-    const exportedSkill = { sourceDir, destDir };
+    const exportedSkill: ExportedSkill = { sourceDir, destDir, pkg: pkg.pkg };
     ctx.exportedSkills.push(exportedSkill);
     ctx.manifest.set(sourceDir, exportedSkill);
     ctx.topLevelDirs.push(destDir);
@@ -571,6 +571,7 @@ async function exportGroupedPackage(
     const exportedSkill: ExportedSkill = {
       sourceDir: topic.sourceDir,
       destDir,
+      pkg: pkg.pkg,
       grouped: { topicFile, assetDir },
     };
     ctx.exportedSkills.push(exportedSkill);
