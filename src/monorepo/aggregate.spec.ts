@@ -176,6 +176,7 @@ describe("syncSkills monorepo aggregation", () => {
       root: tempRoot,
       targets: ["claude"],
       projects: ["backend", "frontend"],
+      layout: "flat",
     });
 
     // "shared" survives via union (frontend kept it); "keep" present once.

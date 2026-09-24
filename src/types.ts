@@ -112,4 +112,9 @@ export type SyncSkillsOptions = {
    * omitted.
    */
   projects?: string[];
+  /**
+   * Export layout for every eligible package. Overrides `agentKit.layout` and
+   * `agentKit.layoutOverrides`. Defaults to the config value, then `"grouped"`.
+   */
+  layout?: "grouped" | "flat";
 };

@@ -36,6 +36,8 @@ export type ScannedSkillPackage = {
   pkgDir: string;
   /** Skill entries auto-discovered inside `<pkgDir>/skills/`. */
   skills: SkillEntry[];
+  /** True for the project's own (or a monorepo project's) authored skills. */
+  authored?: boolean;
 };
 
 /**

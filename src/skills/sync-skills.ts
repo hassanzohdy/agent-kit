@@ -20,14 +20,21 @@ import { resolveMonorepoProjects } from "../monorepo/resolve-projects";
 import { type ProjectScanResult, scanProjects } from "../monorepo/scan-project";
 import type { SkillsTargetName, SyncSkillsOptions } from "../types";
 import { logger } from "../utils/logger";
+import type { SkillsLayout } from "../config/agent-kit-config";
 import { applyOmitFilter, applyPickFilter } from "./filters";
+import { readDescription, splitFrontmatter } from "./frontmatter";
 import {
   deriveSlugForSkill,
+  isRootLayout,
+  removeSkillName,
   resolveProjectPrefix,
   rewriteSkillName,
+  slugifyPackageName,
+  slugifySegment,
 } from "./resolve-flat-name";
 import { rewriteExportedMarkdown, type ExportedSkill } from "./rewrite-skill-links";
 import {
+  DEFAULT_SKILLS_DIRNAME,
   type ScannedSkillPackage,
   type SkillEntry,
   scanForSkillPackages,
@@ -64,6 +71,19 @@ export type SkillsSyncResult = {
   scannedPaths: string[];
   /** Slugs of the monorepo projects that were aggregated (empty when none). */
   projects: string[];
+  /** Per-target export summary (top-level folders, grouped packages, description size). */
+  summaries: TargetSummary[];
+};
+
+/** What one target received; mirrors the logged summary line. */
+export type TargetSummary = {
+  target: SkillsTargetName;
+  /** Top-level skill folders exported. */
+  skills: number;
+  /** Packages exported in the grouped layout. */
+  groupedPackages: number;
+  /** Sum of the top-level exported SKILL.md description lengths. */
+  descriptionChars: number;
 };
 
 /**
@@ -112,6 +132,7 @@ export async function syncSkills(
   const localSkills = rootScanResults.pop() as ScannedSkillPackage | null;
   // The project's own skills use the project prefix, not the raw package name.
   if (localSkills) {
+    localSkills.authored = true;
     localSkills.pkg = resolveProjectPrefix(
       localSkills.pkg,
       config?.projectPrefix,
@@ -155,6 +176,8 @@ export async function syncSkills(
   let exported = 0;
   let pruned = 0;
   let skipped = 0;
+  const summaries: TargetSummary[] = [];
+  const routerWarned = new Set<string>();
 
   for (const target of targets) {
     const targetDir = resolve(options.root, getSkillsTargetPath(target));
@@ -168,18 +191,50 @@ export async function syncSkills(
     const exportedSkills: ExportedSkill[] = [];
     const manifest = new Map<string, ExportedSkill>();
 
+    const ctx: ExportContext = {
+      writtenForTarget,
+      override: options.override ?? false,
+      exportedSkills,
+      manifest,
+      topLevelDirs: [],
+      groupedPackages: 0,
+      routerWarned,
+    };
+
     for (const pkg of allPackages) {
-      const result = await exportPackageSkills(pkg, targetDir, {
-        writtenForTarget,
-        override: options.override ?? false,
-        exportedSkills,
-        manifest,
-      });
+      const layout =
+        options.layout ??
+        config?.layoutOverrides?.[pkg.pkg] ??
+        config?.layout ??
+        "grouped";
+      const result = shouldGroup(pkg, layout)
+        ? await exportGroupedPackage(pkg, targetDir, ctx)
+        : await exportPackageSkills(pkg, targetDir, ctx);
       exported += result.exported;
       skipped += result.skipped;
     }
 
     await rewriteExportedMarkdown(exportedSkills, manifest);
+
+    let descriptionChars = 0;
+    for (const dir of ctx.topLevelDirs) {
+      try {
+        const content = await readFile(resolve(dir, "SKILL.md"), "utf8");
+        descriptionChars += readDescription(content)?.length ?? 0;
+      } catch {
+        // No readable SKILL.md — contributes nothing.
+      }
+    }
+    const summary: TargetSummary = {
+      target,
+      skills: ctx.topLevelDirs.length,
+      groupedPackages: ctx.groupedPackages,
+      descriptionChars,
+    };
+    summaries.push(summary);
+    logger.info(
+      `${target}: ${summary.skills} skills (${summary.groupedPackages} grouped packages), ${summary.descriptionChars} description chars`,
+    );
   }
 
   return {
@@ -190,6 +245,7 @@ export async function syncSkills(
     packages: allPackages.map((p) => p.pkg),
     scannedPaths,
     projects: resolvedProjects.map((p) => p.slug),
+    summaries,
   };
 }
 
@@ -302,6 +358,12 @@ type ExportContext = {
   override: boolean;
   exportedSkills: ExportedSkill[];
   manifest: Map<string, ExportedSkill>;
+  /** Absolute paths of the top-level folders exported to this target. */
+  topLevelDirs: string[];
+  /** Packages exported grouped to this target. */
+  groupedPackages: number;
+  /** Packages already warned about a missing router description. */
+  routerWarned: Set<string>;
 };
 
 
@@ -389,6 +451,7 @@ async function exportPackageSkills(
     const exportedSkill = { sourceDir, destDir };
     ctx.exportedSkills.push(exportedSkill);
     ctx.manifest.set(sourceDir, exportedSkill);
+    ctx.topLevelDirs.push(destDir);
     exported++;
   }
 
@@ -396,6 +459,182 @@ async function exportPackageSkills(
 }
 
 
+
+/**
+ * A dependency package is grouped when its layout is "grouped" and it has two
+ * or more skills. Authored (project / monorepo project) skills and root-layout
+ * skills always export flat.
+ */
+function shouldGroup(pkg: ScannedSkillPackage, layout: SkillsLayout): boolean {
+  return (
+    layout === "grouped" &&
+    !pkg.authored &&
+    pkg.skills.length >= 2 &&
+    !pkg.skills.some(isRootLayout)
+  );
+}
+
+type Topic = { name: string; sourceDir: string; description: string };
+
+/**
+ * Export a package as ONE folder: a router `SKILL.md` plus a `<topic>.md` per
+ * skill (and `<topic>/` for that skill's other files). Same collision,
+ * user-authored and symlink rules as {@link exportPackageSkills}.
+ */
+async function exportGroupedPackage(
+  pkg: ScannedSkillPackage,
+  targetDir: string,
+  ctx: ExportContext,
+): Promise<ExportTally> {
+  const slug = slugifyPackageName(pkg.pkg);
+  const pkgRoot = resolve(pkg.pkgDir);
+  const skillsRoot = resolve(pkg.pkgDir, DEFAULT_SKILLS_DIRNAME);
+  let skipped = 0;
+
+  const topics: Topic[] = [];
+  const taken = new Set<string>();
+  for (const skill of pkg.skills) {
+    const sourceDir = resolve(pkg.pkgDir, skill.path);
+    if (!(await isDirectory(sourceDir))) continue;
+
+    if (await containsUnsafeSymlink(sourceDir, pkgRoot)) {
+      logger.warn(
+        `Skipping "${slug}" topic "${skill.name}" from package "${pkg.pkg}": its skill source contains a symlink that resolves outside the package. Refusing to copy it (possible supply-chain tampering).`,
+      );
+      skipped++;
+      continue;
+    }
+
+    // "skill" would collide with the router's SKILL.md on case-insensitive disks.
+    const name = slugifySegment(skill.name);
+    if (name === "skill" || taken.has(name)) {
+      logger.warn(
+        `Skipping topic "${skill.name}" from package "${pkg.pkg}": "${name}.md" is already taken in the grouped export.`,
+      );
+      skipped++;
+      continue;
+    }
+    taken.add(name);
+
+    const source = await readFile(resolve(sourceDir, "SKILL.md"), "utf8");
+    topics.push({
+      name,
+      sourceDir,
+      description: readDescription(source) ?? "",
+    });
+  }
+  if (topics.length === 0) return { exported: 0, skipped };
+  topics.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+  const owner = ctx.writtenForTarget.get(slug);
+  if (owner && owner.pkg !== pkg.pkg) {
+    throw new Error(
+      `Skill destination collision: packages "${owner.pkg}" and "${pkg.pkg}" both produce the slug "${slug}". Rename a skill folder in one of them.`,
+    );
+  }
+
+  const destDir = resolve(targetDir, slug);
+  if (await isUserAuthored(destDir)) {
+    if (!ctx.override) {
+      logger.warn(
+        `Skipping "${slug}": destination exists and is not managed by agent-kit. Pass --override to replace it.`,
+      );
+      return { exported: 0, skipped: skipped + 1 };
+    }
+    await rm(destDir, { recursive: true, force: true });
+  }
+
+  const router = await buildRouter(pkg, slug, skillsRoot, topics, ctx);
+
+  await mkdir(destDir, { recursive: true });
+  await writeFile(resolve(destDir, MANAGED_SENTINEL), "", "utf8");
+  await writeFile(resolve(destDir, "SKILL.md"), router, "utf8");
+
+  for (const topic of topics) {
+    const skillFile = resolve(topic.sourceDir, "SKILL.md");
+    const topicFile = resolve(destDir, `${topic.name}.md`);
+    const assetDir = resolve(destDir, topic.name);
+
+    const source = await readFile(skillFile, "utf8");
+    await writeFile(topicFile, removeSkillName(source), "utf8");
+
+    // Everything except the topic's own SKILL.md (already written above).
+    await cp(topic.sourceDir, assetDir, {
+      recursive: true,
+      dereference: process.platform === "win32",
+      filter: (src) => resolve(src) !== skillFile,
+    });
+    if ((await readdir(assetDir)).length === 0) {
+      await rm(assetDir, { recursive: true, force: true });
+    }
+
+    const exportedSkill: ExportedSkill = {
+      sourceDir: topic.sourceDir,
+      destDir,
+      grouped: { topicFile, assetDir },
+    };
+    ctx.exportedSkills.push(exportedSkill);
+    ctx.manifest.set(topic.sourceDir, exportedSkill);
+  }
+
+  ctx.writtenForTarget.set(slug, { pkg: pkg.pkg, sourceDir: skillsRoot });
+  ctx.topLevelDirs.push(destDir);
+  ctx.groupedPackages++;
+  return { exported: 1, skipped };
+}
+
+/** Build the router SKILL.md for a grouped package. */
+async function buildRouter(
+  pkg: ScannedSkillPackage,
+  slug: string,
+  skillsRoot: string,
+  topics: Topic[],
+  ctx: ExportContext,
+): Promise<string> {
+  const indexFile = resolve(skillsRoot, "index.md");
+  let index: string | null = null;
+  if (
+    (await isFile(indexFile)) &&
+    !(await containsUnsafeSymlink(indexFile, resolve(pkg.pkgDir)))
+  ) {
+    index = await readFile(indexFile, "utf8");
+  }
+
+  let description = index === null ? undefined : readDescription(index);
+  if (description === undefined) {
+    if (!ctx.routerWarned.has(pkg.pkg)) {
+      ctx.routerWarned.add(pkg.pkg);
+      logger.warn(
+        `${pkg.pkg} has no skills/index.md description; generated a router description`,
+      );
+    }
+    description = `${pkg.pkg} skills: ${topics.map((t) => t.name).join(", ")}`;
+  }
+
+  const body = index === null ? "" : splitFrontmatter(index).body;
+  const rows = topics.map(
+    (t) =>
+      `| [${t.name}.md](./${t.name}.md) | ${t.description.replace(/\|/g, "\\|")} |`,
+  );
+
+  let out = `---\nname: ${slug}\ndescription: ${JSON.stringify(description)}\n---\n\n`;
+  if (body.trim() !== "") {
+    out += body.endsWith("\n") ? body : `${body}\n`;
+    out += "\n";
+  }
+  out += "## Topics\n\nRead only the file for the task at hand.\n\n";
+  out += "| File | Read it when |\n|---|---|\n";
+  out += `${rows.join("\n")}\n`;
+  return out;
+}
+
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Set the exported SKILL.md frontmatter `name:` to the folder slug. Removes the

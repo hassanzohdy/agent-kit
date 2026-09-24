@@ -1,17 +1,40 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "pathe";
 
-export type ExportedSkill = { sourceDir: string; destDir: string };
+export type ExportedSkill = {
+  sourceDir: string;
+  destDir: string;
+  /**
+   * Set for a topic of a grouped package: its SKILL.md is exported to
+   * `topicFile` and every other file under `assetDir`.
+   */
+  grouped?: { topicFile: string; assetDir: string };
+};
+
+/** Where a source file inside `skill` lands in the export. */
+function destPathFor(skill: ExportedSkill, sourcePath: string): string {
+  const rel = relative(skill.sourceDir, sourcePath);
+  if (!skill.grouped) return resolve(skill.destDir, rel);
+  if (rel === "SKILL.md") return skill.grouped.topicFile;
+  return resolve(skill.grouped.assetDir, rel);
+}
 
 /** Rewrites only destinations that cross from one exported skill to another. */
 export async function rewriteExportedMarkdown(
   exportedSkills: ExportedSkill[], manifest: Map<string, ExportedSkill>,
 ): Promise<void> {
   for (const skill of exportedSkills) for (const sourceFile of await findMarkdownFiles(skill.sourceDir)) {
-    const destFile = resolve(skill.destDir, relative(skill.sourceDir, sourceFile));
-    const content = await readFile(sourceFile, "utf8");
+    const destFile = destPathFor(skill, sourceFile);
+    // Start from the exported copy, not the source: export already rewrote its
+    // frontmatter (name slug / stripped topic name), and re-reading the source
+    // here would silently undo that.
+    const content = await readFile(destFile, "utf8");
     const rewritten = rewriteMarkdownLinks(content, sourceFile, destFile, manifest);
-    if (rewritten !== content) await writeFile(destFile, rewritten, "utf8");
+    if (rewritten === content) continue;
+    // Replace rather than write through: a preserved symlink must never carry
+    // the edit back into the source package.
+    await rm(destFile, { force: true });
+    await writeFile(destFile, rewritten, "utf8");
   }
 }
 
@@ -90,8 +113,10 @@ function rewriteRelativeDestination(destination: string, sourceFile: string, des
   const target = resolve(dirname(sourceFile), sourcePathname);
   const targetSkill = findOwningSkill(target, manifest);
   const sourceSkill = findOwningSkill(sourceFile, manifest);
-  if (!targetSkill || !sourceSkill || targetSkill === sourceSkill) return destination;
-  const outputTarget = resolve(targetSkill.destDir, relative(targetSkill.sourceDir, target));
+  if (!targetSkill || !sourceSkill) return destination;
+  // Inside one flat skill nothing moves; inside a grouped topic SKILL.md does.
+  if (targetSkill === sourceSkill && !targetSkill.grouped) return destination;
+  const outputTarget = destPathFor(targetSkill, target);
   let outputRelative = relative(dirname(destFile), outputTarget).replaceAll("\\", "/");
   if (!outputRelative.startsWith(".")) outputRelative = `./${outputRelative}`;
   return outputRelative.replace(/([ ()])/g, (character) => `\\${character}`) + suffix;

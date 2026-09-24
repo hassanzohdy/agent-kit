@@ -46,7 +46,12 @@ export async function scanProject(
   const authoredSkills = await autoDiscoverSkills(project.dir, project.slug);
   const authored: ScannedSkillPackage | null =
     authoredSkills.length > 0
-      ? { pkg: project.slug, pkgDir: project.dir, skills: authoredSkills }
+      ? {
+          pkg: project.slug,
+          pkgDir: project.dir,
+          skills: authoredSkills,
+          authored: true,
+        }
       : null;
 
   // Dependency skills: scan the project's own node_modules, then apply the

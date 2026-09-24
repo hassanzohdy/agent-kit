@@ -43,6 +43,16 @@ describe("syncSkills naming", () => {
     expect(original).toBe(source);
   });
 
+  it("keeps the rewritten name when the skill's links are also rewritten (flat)", async () => {
+    await writePackage(nodeModules, "foo", "a", "---\nname: a\n---\nSee [b](../b/SKILL.md)\n");
+    await writePackage(nodeModules, "foo", "b", "---\nname: b\n---\n# b\n");
+
+    await syncSkills({ root, targets: ["claude"], layout: "flat" });
+
+    const exported = await readFile(resolve(root, ".claude/skills/foo-a/SKILL.md"), "utf8");
+    expect(exported).toBe("---\nname: foo-a\n---\nSee [b](../foo-b/SKILL.md)\n");
+  });
+
   it("inserts a name line when the frontmatter has none", async () => {
     await writePackage(
       nodeModules,
@@ -69,7 +79,7 @@ describe("syncSkills naming", () => {
     await writeFile(resolve(pkgDir, "skills/a/b/SKILL.md"), "# one", "utf8");
     await writeFile(resolve(pkgDir, "skills/a-b/SKILL.md"), "# two", "utf8");
 
-    await syncSkills({ root, targets: ["claude"] });
+    await syncSkills({ root, targets: ["claude"], layout: "flat" });
 
     const message = warn.mock.calls
       .map((call) => String(call[0]))

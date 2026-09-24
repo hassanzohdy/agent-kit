@@ -65,7 +65,7 @@ export function slugifyPackageName(pkgName: string): string {
  * Lowercases and replaces every non-kebab-safe character with `-`. Path
  * separators in nested names (`backend/auth`) collapse to `-` here.
  */
-function slugifySegment(segment: string): string {
+export function slugifySegment(segment: string): string {
   return segment.replace(/[^a-zA-Z0-9-]+/g, "-").toLowerCase();
 }
 
@@ -73,7 +73,7 @@ function slugifySegment(segment: string): string {
  * Pattern A detection: skill path points at the `skills/` folder itself
  * (single-skill layout) rather than a subdirectory.
  */
-function isRootLayout(skill: SkillEntry): boolean {
+export function isRootLayout(skill: SkillEntry): boolean {
   return (
     skill.path === `./${DEFAULT_SKILLS_DIRNAME}` ||
     skill.path === DEFAULT_SKILLS_DIRNAME
@@ -133,4 +133,23 @@ export function rewriteSkillName(content: string, name: string): string {
 
   lines.splice(1, 0, `name: ${name}${eolOf(lines[0] ?? "") || "\n"}`);
   return lines.join("");
+}
+
+/**
+ * Remove the `name:` line from a SKILL.md YAML frontmatter. Everything else,
+ * including line endings, is preserved byte-for-byte.
+ */
+export function removeSkillName(content: string): string {
+  const lines = content.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  const fence = /^---[ \t]*\r?\n?$/;
+  if (lines.length === 0 || !fence.test(lines[0] ?? "")) return content;
+
+  for (let i = 1; i < lines.length; i++) {
+    if (fence.test(lines[i] ?? "")) return content;
+    if (/^name[ \t]*:/.test(lines[i])) {
+      lines.splice(i, 1);
+      return lines.join("");
+    }
+  }
+  return content;
 }

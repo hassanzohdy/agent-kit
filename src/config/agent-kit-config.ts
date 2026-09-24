@@ -95,7 +95,19 @@ export type AgentKitConfig = {
    * keep their directory-name prefix regardless.
    */
   projectPrefix?: string;
+  /**
+   * How a dependency package's skills are exported. `"grouped"` (the default)
+   * writes ONE folder per package with a router `SKILL.md` and one `.md` file
+   * per topic; `"flat"` writes one top-level folder per skill. Only packages
+   * with two or more skills are grouped.
+   */
+  layout?: SkillsLayout;
+  /** Per-package {@link layout} override, keyed by exact package name. */
+  layoutOverrides?: Record<string, SkillsLayout>;
 };
+
+/** Skill export layout. See {@link AgentKitConfig.layout}. */
+export type SkillsLayout = "grouped" | "flat";
 
 /** Sentinel value distinguishing "config field missing" from "field is null". */
 type ConfigResolution =
@@ -168,7 +180,21 @@ function normalizeAgentKitConfig(raw: Record<string, unknown>): AgentKitConfig {
     config.projectPrefix = raw.projectPrefix;
   }
 
+  if (isSkillsLayout(raw.layout)) config.layout = raw.layout;
+
+  if (isRecord(raw.layoutOverrides)) {
+    const overrides: Record<string, SkillsLayout> = {};
+    for (const [pkg, value] of Object.entries(raw.layoutOverrides)) {
+      if (isSkillsLayout(value)) overrides[pkg] = value;
+    }
+    if (Object.keys(overrides).length > 0) config.layoutOverrides = overrides;
+  }
+
   return config;
+}
+
+function isSkillsLayout(value: unknown): value is SkillsLayout {
+  return value === "grouped" || value === "flat";
 }
 
 /**

@@ -968,7 +968,7 @@ describe("syncSkills with scanPaths", () => {
       "utf8",
     );
 
-    await syncSkills({ root: tempRoot, targets: ["claude", "opencode"] });
+    await syncSkills({ root: tempRoot, targets: ["claude", "opencode"], layout: "flat" });
 
     for (const targetRoot of [".claude/skills", ".opencode/skill"]) {
       const exportedAlpha = resolve(tempRoot, targetRoot, "source-alpha");
