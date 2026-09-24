@@ -4,6 +4,15 @@ All notable changes to `@mongez/agent-kit` are documented here. The format follo
 
 ---
 
+## [1.3.1]
+
+### Fixed
+
+- **Windows: grouped export copied each topic's `SKILL.md` into its asset folder.** The asset copy used a `cp` filter that compared paths, and on Windows + Node 20 the path form differs, so `<pkg>/<topic>/SKILL.md` was written (an extra nested `SKILL.md` an agent may list as another skill) and empty asset folders were left behind. Assets are now enumerated by name.
+- **Windows: a symlink inside a package was refused when the project is reached through an alias.** The escape check compared the link's real path with the package's unresolved path, so a junction/symlinked project folder or an 8.3 short path (`C:UsersRUNNER~1`) made an internal link look like an escape and the skill was skipped. Real paths are now compared on both sides. This is why the Windows CI job had been failing since 1.2.1.
+
+---
+
 ## [1.3.0]
 
 ### Added
