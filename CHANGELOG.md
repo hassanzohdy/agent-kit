@@ -4,6 +4,28 @@ All notable changes to `@mongez/agent-kit` are documented here. The format follo
 
 ---
 
+## [1.3.0]
+
+### Added
+
+- **Grouped skill layout.** New `agentKit.layout: "auto" | "grouped" | "flat"` (default `"auto"`) and per-package `agentKit.layoutOverrides: { "<pkg>": layout }`. A dependency package with two or more skills can now export as ONE folder: `<pkgSlug>/SKILL.md` is a router (its `description` comes from the package's `skills/index.md` frontmatter; its body is the `index.md` body plus a generated **Topics** table built from each topic's own `description`), `<pkgSlug>/<topic>.md` is each topic (frontmatter `name:` removed), and `<topic>/` holds the topic's assets. `"auto"` groups a package only when it ships `skills/index.md`; `"grouped"` forces grouping; `"flat"` is the 1.2 behaviour. Single-skill packages, root-layout skills and the project's own skills always stay flat. Why: agents budget their skill listings — Claude Code keeps descriptions for only about 20k chars and Codex dropped every description at 300 skills. A real app went from 223 listed skills (135k description chars) to 27 (19k).
+- **`skills/index.md` package-author contract.** Frontmatter `description` of 400–700 chars (purpose, key exported identifiers, user phrasings, "Not this package →" pointers), plus a short orientation body. Never write the topics table by hand — agent-kit generates it. It is `index.md` and not `skills/SKILL.md` because agent-kit ≤ 1.2 treats a root `SKILL.md` as a single-skill package.
+- **`agentKit.projectPrefix`.** Overrides the slug prefix of the project's own skills. The default now falls back to `project` when the package-name slug does not start with a letter (e.g. `5.7` → `5-7`).
+- **Per-target summary line** — `claude: N skills (G grouped packages), C description chars` — and a `summaries` field in the sync result.
+- `SyncSkillsOptions.layout` overrides the config for a programmatic run.
+
+### Changed
+
+- The exported `SKILL.md` frontmatter `name:` is rewritten to the exported folder slug (source files are untouched). It previously kept the source name, which mismatched the folder and produced collisions — in one app 147 of 223 skills kept a bare name and six were all called `overview`.
+
+### Fixed
+
+- Two skills resolving to the same slug now produce a warning naming both sources.
+- Links to a sibling skill's directory (`../overview/`, anchors kept) and package-specifier links (`@scope/pkg/<topic>/SKILL.md`) now resolve to the exported location when that package is exported; other specifiers are left untouched. Broken relative links in a real app dropped from 455 to 12 (grouped) and 374 to 12 (flat).
+- Link rewriting starts from the exported copy, so a flat skill no longer loses its rewritten `name:`, and it replaces rather than writes through a preserved symlink.
+
+---
+
 ## [1.2.2]
 
 ### Fixed

@@ -319,7 +319,40 @@ Then add `skills` to your `package.json` `files` field so it ships:
 }
 ```
 
-> **Folder name is the routing identity.** Claude Code routes by folder name; SKILL.md frontmatter `name:` is purely cosmetic. `agent-kit` never reads or rewrites your SKILL.md content — your source file is copied verbatim into the destination folder.
+> **Folder name is the routing identity.** Claude Code routes by folder name. On export, `agent-kit` rewrites the frontmatter `name:` to the exported folder slug and rewrites relative links between skills; the rest of your SKILL.md is copied verbatim and your source files are never touched.
+
+### Layouts: grouped vs flat
+
+Agents budget their skill listings (Claude Code keeps only about 20k chars of descriptions; Codex dropped every description at 300 skills), so 200+ flat skills can leave the agent blind. `agentKit.layout` controls how a dependency package's skills are exported:
+
+| `layout` | Behaviour |
+|---|---|
+| `"auto"` (default) | Group a package with 2+ skills **only when it ships `skills/index.md`**. Everything else exports flat, exactly as in 1.2. |
+| `"grouped"` | Force grouping for every package with 2+ skills. |
+| `"flat"` | One top-level folder per skill (the 1.2 behaviour). |
+
+```json
+{ "agentKit": { "layout": "auto", "layoutOverrides": { "@some-vendor/sdk": "flat" } } }
+```
+
+A grouped package exports as one folder:
+
+```
+.claude/skills/warlock-js-core/
+  SKILL.md          # router: index.md description + body, plus a generated Topics table
+  routing.md        # one file per topic, opened on demand (frontmatter `name:` removed)
+  routing/          # that topic's assets
+```
+
+Single-skill packages, root-layout skills and your project's own skills always stay flat. Each target's summary line reports the effect: `claude: 27 skills (9 grouped packages), 19000 description chars`.
+
+**Package authors:** opt in by shipping `skills/index.md` — frontmatter `description` of 400–700 chars (purpose, key exported identifiers, phrasings users say, and "Not this package →" pointers) plus a short orientation body. Never write the topics table; agent-kit generates it from each topic's own `description`. It is `index.md`, not `skills/SKILL.md`, because agent-kit ≤ 1.2 would read a root `SKILL.md` as a single-skill package.
+
+### Naming, prefixes and links
+
+- The exported `SKILL.md` frontmatter `name:` is rewritten to the exported folder slug; a warning names both sources when two skills resolve to the same slug.
+- Your project's own skills are prefixed with the slug of your `package.json` `name` — or `project` when that slug doesn't start with a letter. Set `agentKit.projectPrefix` to choose one.
+- Links to a sibling skill's directory and package-specifier links (`@scope/pkg/<topic>/SKILL.md`) resolve to the exported location when that package is exported.
 
 ### Safety guarantees
 
@@ -356,6 +389,9 @@ An optional `agentKit` block configures defaults that apply to every `agent-kit 
 | `targets` | Default skill-sync targets when the CLI omits `--target`. |
 | `pick` | Allowlist — only listed packages are synced. `true` includes the whole package; `string[]` includes only the named skills (by source folder name). |
 | `omit` | Denylist — drop entire packages (`true`) or specific skills (`string[]`). Runs after `pick`. Also acts as a global veto over monorepo-aggregated skills. |
+| `layout` | `"auto"` (default), `"grouped"` or `"flat"` — see [Layouts](#layouts-grouped-vs-flat). |
+| `layoutOverrides` | Per-package `layout`, keyed by exact package name. |
+| `projectPrefix` | Slug prefix for your project's own skills; default is the `name` slug, or `project` if that doesn't start with a letter. |
 | `monorepo.projects` | Sibling project dirs (or one-level globs like `apps/*`) to aggregate into this root's skill dirs. Each is scanned as its own project — its `node_modules/` deps (filtered by *that project's* `agentKit` config) plus its authored `skills/`, prefixed with the project dir name. Default for `--projects`. |
 
 Malformed sub-fields are silently dropped — a typo in one entry never blocks the whole sync.

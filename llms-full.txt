@@ -174,6 +174,9 @@ Configure defaults and filters from the project root's `package.json`:
   - `omit[pkg] = true` → skip the entire package's skills.
   - `omit[pkg] = ["skill-name"]` → skip specific skills from that package (matched against the source folder name, not the flat slug).
   - Entries for packages not installed are silently ignored.
+- **`layout`** — `"auto"` (default) groups a package with 2+ skills only when it ships `skills/index.md`; `"grouped"` forces grouping; `"flat"` = 1.2 behaviour. Grouped export: `<pkgSlug>/SKILL.md` router (index.md description + body + generated Topics table), `<pkgSlug>/<topic>.md`, `<topic>/` assets. Single-skill, root-layout and project-own skills stay flat. Reason: agents budget skill listings (Claude Code ~20k description chars; Codex dropped all at 300 skills). Summary line: `claude: N skills (G grouped packages), C description chars`.
+- **`layoutOverrides`** — `{ "<pkg>": layout }`, exact package names; beats `layout`.
+- **`projectPrefix`** — slug prefix for the project's own skills; default is the `name` slug, or `project` if it doesn't start with a letter.
 - **`monorepo.projects`** — sibling project dirs (or one-level globs) to aggregate into this root's skill dirs. Each is scanned as its own project; its deps are filtered by *its own* `pick`/`omit`; its authored `skills/` are prefixed with the project dir name. Root `omit` applies as a global veto over the aggregate. See the Monorepos skill.
 - Common pattern: `pick` an allowlist of packages, then `omit` a noisy skill from one of them.
 
@@ -216,7 +219,7 @@ Multiple agents at once: `agent-kit sync --target claude,cursor,codex` (or `agen
 
 # Skill: configuration
 
-> **Auto-trigger:** user edits or asks about the `agentKit` config block in `package.json` — `targets`, `pick`, `omit`, `monorepo.projects` — or about filtering noisy dependency skills / pinning default targets.
+> **Auto-trigger:** user edits or asks about the `agentKit` config block in `package.json` — `targets`, `pick`, `omit`, `layout`, `layoutOverrides`, `projectPrefix`, `monorepo.projects` — or about filtering noisy dependency skills / pinning default targets.
 
 The `agentKit` block in the project root `package.json` sets defaults for every `agent-kit sync` (CLI flags still override). Malformed sub-fields are silently dropped.
 
@@ -356,6 +359,10 @@ Common mistakes and how to avoid them.
 
 The `description` field is the most important line — it determines whether an agent picks up the skill in the first place. Make it specific.
 
+### `skills/index.md` — opt in to grouped export
+
+Ship `skills/index.md` (frontmatter `description` 400–700 chars: purpose, key exported identifiers, user phrasings, "Not this package →" pointers; plus a short orientation body) and consumers on `layout: "auto"` get one router skill + topic files instead of one listed skill per topic. Never write the topics table — agent-kit generates it from each topic's `description`. It is not `skills/SKILL.md` because agent-kit ≤ 1.2 treats a root SKILL.md as a single-skill package. Exported `name:` is rewritten to the exported folder slug.
+
 # Skill: troubleshooting
 
 > **Auto-trigger:** user reports any error/log line from `agent-kit init`/`sync`/`watch`; user says "command not found", "skills aren't showing", "wrong package", "pick matched no installed packages", "collision", "AGENTS.md missing", "my skill folder disappeared"; user asks "why doesn't X work" after an agent-kit command.
@@ -373,3 +380,5 @@ Symptom → cause → fix for the common failure modes.
 - **`--target` "Unknown skill target(s)"** — valid names: `claude`, `copilot`, `cursor`, `codex`, `opencode`, `amp`, `goose`, `kiro`, `antigravity`. `init` validates BEFORE writing — typos never persist.
 - **`watch` ignores `node_modules/**`** — by design (deps change on reinstall, not on edit). For local-linked packages, pass `--path <parent-dir>` so watch treats them as first-class sources.
 - **Hand-authored skill folder vanished after `sync`** — almost always `--override`. Drop it; without `--override`, hand-authored destinations are skipped with a warning, never replaced. Restore from git history.
+- **My package's skills are not grouped** — `layout: "auto"` groups only packages shipping `skills/index.md` with 2+ skills; single-skill packages never group; check `layoutOverrides`. Add `index.md`, or force `"grouped"`.
+- **Router description looks generic** — it comes from `skills/index.md` frontmatter `description`; add a 400–700 char one and re-sync.

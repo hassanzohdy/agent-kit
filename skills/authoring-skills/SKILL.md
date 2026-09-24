@@ -98,7 +98,7 @@ The Claude Code Skills docs explicitly state: *"name — Display name for the sk
 - **Omit `name:` from frontmatter** — Claude uses the folder name (the auto-derived slug). Simplest, recommended.
 - **Set `name:` to a custom display label** — e.g. `name: Using the thing` for a prettier label in Claude's UI. Routing still happens by folder name; this is purely cosmetic.
 
-`agent-kit` **never reads or modifies** the SKILL.md content during sync. Your source file is copied verbatim into the destination folder.
+On export, `agent-kit` rewrites the frontmatter `name:` to the exported folder slug and rewrites relative links between skills; your source files are never modified and the rest of the content is copied verbatim.
 
 ## Writing a good SKILL.md
 
@@ -130,6 +130,28 @@ The naming is up to you (`<pkg>-overview`, `<pkg>-conventions`, `<pkg>-fundament
 For Pattern A packages (single root `skills/SKILL.md`), the root file IS the front door — same convention, simpler structure.
 
 The `description` field is the most important line — it determines both whether an agent surfaces the skill *and* whether it loads it for the right task. Make it specific: name the concrete triggers (what the user imports, edits, or asks) so the skill fires when relevant and stays quiet otherwise. A vague description either never triggers or triggers on everything.
+
+### `skills/index.md` — opt in to grouped export
+
+A package with two or more skills can export as **one router skill plus topic files** instead of one listed skill per topic. Agents budget their skill listings, so this keeps a many-package app readable (a real app went from 223 listed skills to 27). Opt in by shipping `skills/index.md`:
+
+```markdown
+---
+description: 400–700 chars. What the package is for, the key exported identifiers, the phrasings users say, and "Not this package →" pointers to neighbours.
+---
+
+# my-package
+
+Two or three sentences of orientation: what the package does and how the topics relate.
+```
+
+- **`description` (400–700 chars)** becomes the router's description — the only text the agent sees before opening the package. Include purpose, key exported identifiers, user phrasings, and `Not this package → @scope/other` pointers.
+- **Body** — a short orientation. It becomes the router body.
+- **Never write the topics table by hand.** agent-kit appends a generated **Topics** table built from each topic's own `description`, so keep every topic's `description` accurate.
+
+Consumers on `layout: "auto"` (the default) get `<pkgSlug>/SKILL.md` (router), `<pkgSlug>/<topic>.md` (each topic, frontmatter `name:` removed) and `<topic>/` (assets). Packages without `index.md` keep exporting flat.
+
+**Why `index.md` and not `skills/SKILL.md`?** agent-kit ≤ 1.2 treats a root `skills/SKILL.md` as a single-skill package, which would collapse your topics for older consumers. `index.md` is invisible to them, so shipping it is safe.
 
 ## Don't ship runtime concerns as skills
 

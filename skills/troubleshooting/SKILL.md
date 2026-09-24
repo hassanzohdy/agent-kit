@@ -1,7 +1,7 @@
 ---
 name: mongez-agent-kit-troubleshooting
 description: |
-  Symptom → cause → fix for the common @mongez/agent-kit problems: `agent-kit: command not found`, unscoped `npx agent-kit` fetching the wrong package, skills synced but the agent doesn't see them, `agentKit.pick matched no installed packages`, two-package slug collision, `sync` errors on missing AGENTS.md, a published package's `skills/` invisible to consumers, `--target` typos, `watch` not re-firing on `node_modules` edits, and a hand-authored skill folder vanishing after `sync --override`.
+  Symptom → cause → fix for the common @mongez/agent-kit problems: `agent-kit: command not found`, unscoped `npx agent-kit` fetching the wrong package, skills synced but the agent doesn't see them, `agentKit.pick matched no installed packages`, two-package slug collision, `sync` errors on missing AGENTS.md, a published package's `skills/` invisible to consumers, `--target` typos, `watch` not re-firing on `node_modules` edits, a package's skills not being grouped, a generic router description, and a hand-authored skill folder vanishing after `sync --override`.
 ---
 
 # Troubleshooting
@@ -143,8 +143,24 @@ npx agent-kit watch --path ../linked-packages
 
 **Fix.** Drop `--override` from the invocation. Without it, hand-authored destinations are **skipped with a warning**, not replaced. Restore the folder from git history; future syncs without `--override` will leave it untouched.
 
+## My package's skills are not grouped
+
+**Symptom.** A dependency with several skills still exports as one folder per skill, and the summary line shows `0 grouped packages`.
+
+**Cause.** With the default `layout: "auto"`, only packages that ship `skills/index.md` are grouped. Also, a package with a single skill (or a root `skills/SKILL.md`) is never grouped, and `layoutOverrides` may pin it to `"flat"`.
+
+**Fix.** Add `skills/index.md` to the package (see **[Authoring skills](../authoring-skills/)**) and make sure it has two or more skills. To group a package you don't control, set `"layout": "grouped"` or `"layoutOverrides": { "<pkg>": "grouped" }`.
+
+## The router description looks generic
+
+**Symptom.** A grouped package's router `SKILL.md` has a bland or empty `description`, so the agent never picks it.
+
+**Cause.** The router description comes from the `description` in `skills/index.md` frontmatter. If it is missing (or the file has no frontmatter), there is nothing specific to show.
+
+**Fix.** Add a 400–700 char `description` to `skills/index.md` — purpose, key exported identifiers, user phrasings, and "Not this package →" pointers — then re-run `agent-kit sync`.
+
 ## Where to go next
 
 - **[CLI usage](../cli-usage/)** — every flag and exact exit behavior
-- **[Configuration](../configuration/)** — the `agentKit` block (`targets`, `pick`, `omit`, `monorepo.projects`)
+- **[Configuration](../configuration/)** — the `agentKit` block (`targets`, `pick`, `omit`, `layout`, `projectPrefix`, `monorepo.projects`)
 - **[Agent integrations](../agent-integrations/)** — per-IDE walkthroughs (Claude Code, Cursor, Codex, Kiro, Copilot, Antigravity, OpenCode, Amp, Goose, Gemini CLI, Aider)

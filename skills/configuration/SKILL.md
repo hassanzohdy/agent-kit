@@ -1,7 +1,7 @@
 ---
 name: mongez-agent-kit-configuration
 description: |
-  The `agentKit` config block in `package.json` for `@mongez/agent-kit` — every field and how it resolves: `targets` (default skill-sync agents), `pick` (allowlist) and `omit` (denylist) for filtering noisy dependency skills, and `monorepo.projects` for aggregating sibling projects. Covers pick-then-omit ordering, per-project config in a monorepo, and the root `omit` global veto.
+  The `agentKit` config block in `package.json` for `@mongez/agent-kit` — every field and how it resolves: `targets` (default skill-sync agents), `pick` (allowlist) and `omit` (denylist) for filtering noisy dependency skills, `layout`/`layoutOverrides` for grouped vs flat export, `projectPrefix` for the project's own skill slugs, and `monorepo.projects` for aggregating sibling projects. Covers pick-then-omit ordering, per-project config in a monorepo, and the root `omit` global veto.
 ---
 
 # Configuration (`agentKit` in `package.json`)
@@ -21,6 +21,9 @@ Every `agent-kit sync` invocation reads an optional `agentKit` block from the pr
       "@some-vendor/sdk": true,
       "@warlock.js/core": ["add-connector"]
     },
+    "layout": "auto",
+    "layoutOverrides": { "@some-vendor/sdk": "flat" },
+    "projectPrefix": "my-app",
     "monorepo": {
       "projects": ["backend", "frontend"]
     }
@@ -79,6 +82,36 @@ Drop packages or specific skills. Keys are exact package names.
     "omit": { "@warlock.js/core": ["add-connector"] }
   }
 }
+```
+
+## `layout` — grouped vs flat export
+
+How a dependency package's skills are exported. Agents budget their skill listings (Claude Code keeps descriptions for only about 20k chars; Codex dropped every description at 300 skills), so many flat skills can hide each other.
+
+- `"auto"` (default) — group a package with 2+ skills **only when it ships `skills/index.md`**; everything else is flat, as in 1.2.
+- `"grouped"` — force grouping for every package with 2+ skills.
+- `"flat"` — one top-level folder per skill (the 1.2 behaviour).
+
+```json
+{ "agentKit": { "layout": "grouped" } }
+```
+
+A grouped package exports `<pkgSlug>/SKILL.md` (a router: the package's `index.md` description and body plus a generated Topics table), `<pkgSlug>/<topic>.md` per topic, and `<topic>/` for its assets. Single-skill packages, root-layout skills and the project's own skills always stay flat. `SyncSkillsOptions.layout` overrides the config for one programmatic run. Each target logs `claude: N skills (G grouped packages), C description chars`.
+
+## `layoutOverrides`
+
+Per-package `layout`, keyed by exact package name; wins over `layout`. Invalid values are dropped.
+
+```json
+{ "agentKit": { "layout": "auto", "layoutOverrides": { "@warlock.js/core": "grouped", "@some-vendor/sdk": "flat" } } }
+```
+
+## `projectPrefix`
+
+Slug prefix for the project's **own** authored skills (`skills/` at the project root). Defaults to the slug of the `package.json` `name`, or `project` when that slug doesn't start with a letter (`5.7` → `5-7` → `project`). Monorepo projects keep their directory-name prefix regardless.
+
+```json
+{ "agentKit": { "projectPrefix": "my-app" } }
 ```
 
 ## `monorepo.projects`
