@@ -4,6 +4,7 @@ import {
   cp,
   lstat,
   mkdir,
+  readFile,
   readdir,
   realpath,
   rm,
@@ -20,7 +21,11 @@ import { type ProjectScanResult, scanProjects } from "../monorepo/scan-project";
 import type { SkillsTargetName, SyncSkillsOptions } from "../types";
 import { logger } from "../utils/logger";
 import { applyOmitFilter, applyPickFilter } from "./filters";
-import { deriveSlugForSkill } from "./resolve-flat-name";
+import {
+  deriveSlugForSkill,
+  resolveProjectPrefix,
+  rewriteSkillName,
+} from "./resolve-flat-name";
 import { rewriteExportedMarkdown, type ExportedSkill } from "./rewrite-skill-links";
 import {
   type ScannedSkillPackage,
@@ -105,6 +110,13 @@ export async function syncSkills(
     scanProjects(resolvedProjects),
   ]);
   const localSkills = rootScanResults.pop() as ScannedSkillPackage | null;
+  // The project's own skills use the project prefix, not the raw package name.
+  if (localSkills) {
+    localSkills.pkg = resolveProjectPrefix(
+      localSkills.pkg,
+      config?.projectPrefix,
+    );
+  }
 
   // Flatten + dedupe by package name. Later scan-roots win, so a package
   // present in both node_modules and a user-provided scanPath gets the
@@ -151,7 +163,7 @@ export async function syncSkills(
     // Track destination slugs we've already written for this target so a
     // second package producing the same destination is detected loudly,
     // not silently clobbered.
-    const writtenForTarget = new Map<string, string>(); // flatName → pkg
+    const writtenForTarget = new Map<string, WrittenSkill>(); // flatName → source
 
     const exportedSkills: ExportedSkill[] = [];
     const manifest = new Map<string, ExportedSkill>();
@@ -281,9 +293,11 @@ function resolveTargets(
   return [...DEFAULT_SKILLS_TARGETS];
 }
 
+type WrittenSkill = { pkg: string; sourceDir: string };
+
 type ExportContext = {
   /** Map of flatName → owning package name, mutated as we write. */
-  writtenForTarget: Map<string, string>;
+  writtenForTarget: Map<string, WrittenSkill>;
   /** When true, replace user-authored folders instead of skipping them. */
   override: boolean;
   exportedSkills: ExportedSkill[];
@@ -337,9 +351,14 @@ async function exportPackageSkills(
     }
 
     const owner = ctx.writtenForTarget.get(flatName);
-    if (owner && owner !== pkg.pkg) {
+    if (owner) {
+      logger.warn(
+        `Skill slug collision: "${owner.pkg}" (${owner.sourceDir}) and "${pkg.pkg}" (${sourceDir}) both export as "${flatName}".`,
+      );
+    }
+    if (owner && owner.pkg !== pkg.pkg) {
       throw new Error(
-        `Skill destination collision: packages "${owner}" and "${pkg.pkg}" both produce the slug "${flatName}". Rename a skill folder in one of them.`,
+        `Skill destination collision: packages "${owner.pkg}" and "${pkg.pkg}" both produce the slug "${flatName}". Rename a skill folder in one of them.`,
       );
     }
 
@@ -365,7 +384,8 @@ async function exportPackageSkills(
       dereference: process.platform === "win32",
     });
     await writeFile(resolve(destDir, MANAGED_SENTINEL), "", "utf8");
-    ctx.writtenForTarget.set(flatName, pkg.pkg);
+    await rewriteExportedName(resolve(destDir, "SKILL.md"), flatName);
+    ctx.writtenForTarget.set(flatName, { pkg: pkg.pkg, sourceDir });
     const exportedSkill = { sourceDir, destDir };
     ctx.exportedSkills.push(exportedSkill);
     ctx.manifest.set(sourceDir, exportedSkill);
@@ -376,6 +396,27 @@ async function exportPackageSkills(
 }
 
 
+
+/**
+ * Set the exported SKILL.md frontmatter `name:` to the folder slug. Removes the
+ * copied file first so a preserved symlink can never write through to the
+ * source in node_modules.
+ */
+async function rewriteExportedName(
+  skillFile: string,
+  slug: string,
+): Promise<void> {
+  let content: string;
+  try {
+    content = await readFile(skillFile, "utf8");
+  } catch {
+    return;
+  }
+  const next = rewriteSkillName(content, slug);
+  if (next === content) return;
+  await rm(skillFile, { force: true });
+  await writeFile(skillFile, next, "utf8");
+}
 
 /**
  * Returns `true` when `entryPath` — or anything nested inside it — is a

@@ -88,6 +88,13 @@ export type AgentKitConfig = {
   monorepo?: {
     projects?: string[];
   };
+  /**
+   * Slug prefix for the project's own authored skills (`skills/` at the
+   * project root). Defaults to the slug of the package.json `name`, or
+   * `project` when that slug does not start with a letter. Monorepo projects
+   * keep their directory-name prefix regardless.
+   */
+  projectPrefix?: string;
 };
 
 /** Sentinel value distinguishing "config field missing" from "field is null". */
@@ -156,6 +163,10 @@ function normalizeAgentKitConfig(raw: Record<string, unknown>): AgentKitConfig {
 
   const monorepo = normalizeMonorepo(raw.monorepo);
   if (monorepo !== null) config.monorepo = monorepo;
+
+  if (typeof raw.projectPrefix === "string" && raw.projectPrefix.length > 0) {
+    config.projectPrefix = raw.projectPrefix;
+  }
 
   return config;
 }

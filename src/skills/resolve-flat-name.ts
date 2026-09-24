@@ -79,3 +79,58 @@ function isRootLayout(skill: SkillEntry): boolean {
     skill.path === DEFAULT_SKILLS_DIRNAME
   );
 }
+
+/** Slug prefix used for project-authored skills when the package name has no usable slug. */
+export const FALLBACK_PROJECT_PREFIX = "project";
+
+/**
+ * Resolve the slug prefix for the project's own authored skills.
+ *
+ * An explicit `agentKit.projectPrefix` wins (slugified). Otherwise the
+ * package.json name is slugified; a slug that does not start with a letter
+ * (e.g. `"5.7"` → `"5-7"`) falls back to {@link FALLBACK_PROJECT_PREFIX}.
+ */
+export function resolveProjectPrefix(
+  pkgName: string,
+  override?: string,
+): string {
+  if (override) {
+    const slug = slugifyPackageName(override).replace(/^-+|-+$/g, "");
+    if (slug) return slug;
+  }
+  const slug = slugifyPackageName(pkgName);
+  return /^[a-z]/.test(slug) ? slug : FALLBACK_PROJECT_PREFIX;
+}
+
+/**
+ * Rewrite the `name:` line of a SKILL.md YAML frontmatter to `name`.
+ *
+ * Every other line and its line ending is preserved. When the frontmatter has
+ * no `name:` line one is inserted as its first line. Content without a
+ * frontmatter block is returned unchanged.
+ */
+export function rewriteSkillName(content: string, name: string): string {
+  const lines = content.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  const fence = /^---[ \t]*\r?\n?$/;
+  if (lines.length === 0 || !fence.test(lines[0] ?? "")) return content;
+
+  let close = -1;
+  for (let i = 1; i < lines.length; i++) {
+    if (fence.test(lines[i] ?? "")) {
+      close = i;
+      break;
+    }
+  }
+  if (close === -1) return content;
+
+  const eolOf = (line: string) => line.match(/\r?\n$/)?.[0] ?? "";
+  for (let i = 1; i < close; i++) {
+    if (/^name[ \t]*:/.test(lines[i])) {
+      lines[i] = `name: ${name}${eolOf(lines[i] ?? "")}`;
+      return lines.join("");
+    }
+  }
+
+  lines.splice(1, 0, `name: ${name}${eolOf(lines[0] ?? "") || "\n"}`);
+  return lines.join("");
+}

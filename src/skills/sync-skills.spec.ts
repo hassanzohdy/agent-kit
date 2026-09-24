@@ -277,7 +277,7 @@ describe("syncSkills", () => {
     ).toBe(false);
   });
 
-  it("copies SKILL.md content verbatim — frontmatter is not rewritten", async () => {
+  it("copies SKILL.md content verbatim except the frontmatter name, which becomes the folder slug", async () => {
     const originalBody =
       "---\nname: custom-display-name\ndescription: original\n---\n\n# original content\n";
     await installFakePackage(nodeModules, "foo", [
@@ -290,7 +290,9 @@ describe("syncSkills", () => {
       resolve(tempRoot, ".claude/skills/foo-bar/SKILL.md"),
       "utf8",
     );
-    expect(synced).toBe(originalBody);
+    expect(synced).toBe(
+      originalBody.replace("name: custom-display-name", "name: foo-bar"),
+    );
   });
 
   it("skips a user-authored destination folder (no sentinel) by default", async () => {
