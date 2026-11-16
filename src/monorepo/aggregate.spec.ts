@@ -53,7 +53,12 @@ async function writeProject(
   await mkdir(dir, { recursive: true });
   await writeFile(
     resolve(dir, "package.json"),
-    JSON.stringify(pkgJson),
+    JSON.stringify({
+      ...pkgJson,
+      // These specs install undeclared fake packages; the default
+      // direct-dependency restriction has its own specs below.
+      agentKit: { includeTransitive: true, ...(pkgJson.agentKit as object) },
+    }),
     "utf8",
   );
   for (const name of authoredSkills) {
@@ -262,6 +267,31 @@ describe("syncSkills monorepo aggregation", () => {
     expect(await fileExists(claudeSkill("backend-code-standards"))).toBe(true);
     expect(await fileExists(claudeSkill("acme-wanted-yes"))).toBe(true);
     expect(await fileExists(claudeSkill("acme-unwanted-no"))).toBe(false);
+  });
+
+  it("restricts a project's node_modules to its declared dependencies by default", async () => {
+    await writeFile(resolve(tempRoot, "package.json"), "{}", "utf8");
+    const backend = await writeProject(
+      tempRoot,
+      "backend",
+      {
+        name: "@acme/backend",
+        dependencies: { "@acme/declared": "1.0.0" },
+        agentKit: { includeTransitive: false },
+      },
+      [],
+    );
+    await installDep(resolve(backend, "node_modules"), "@acme/declared", ["yes"]);
+    await installDep(resolve(backend, "node_modules"), "@acme/hoisted", ["no"]);
+
+    await syncSkills({
+      root: tempRoot,
+      targets: ["claude"],
+      projects: ["backend"],
+    });
+
+    expect(await fileExists(claudeSkill("acme-declared-yes"))).toBe(true);
+    expect(await fileExists(claudeSkill("acme-hoisted-no"))).toBe(false);
   });
 });
 

@@ -4,6 +4,24 @@ All notable changes to `@mongez/agent-kit` are documented here. The format follo
 
 ---
 
+## [1.4.0] — 2026-11-16
+
+### Changed
+
+- **Skills sync only from declared dependencies by default.** With no `pick`, `agent-kit sync` scans only packages named in the project's `dependencies`, `devDependencies`, `peerDependencies` or `optionalDependencies`, so a transitive package can no longer inject skills into `.claude/skills`. A package is matched by the folder it is installed in under `node_modules/` (the key the project wrote, `npm:` aliases included), never by the `name` in its own manifest, so a hoisted package cannot pass by claiming a declared name. Workspace and `file:` packages that resolve to a folder inside the project (outside any `node_modules/`) are the project's own code and are kept. With no readable `package.json` nothing is declared, so dependency skills are skipped and a warning says so. `pick`, `--path` roots and the project's own `skills/` are unaffected.
+
+### Added
+
+- `agentKit.includeTransitive: true` restores scanning every package in `node_modules`.
+
+### Upgrading
+
+- If you relied on skills from packages you do not list in `package.json` (hoisted or transitive ones), set `"agentKit": { "includeTransitive": true }` or name them in `pick`. Otherwise the next `agent-kit sync` prunes those skills.
+
+### Fixed
+
+- **`pick` can no longer be claimed by a look-alike package.** A package under `node_modules/` is matched by the folder it is installed in, not by the `name` in its own manifest, and the match runs before packages are de-duplicated by name, so a hoisted package naming itself after a picked one can neither pass `pick` nor replace the real package's skills. Packages from `--path` roots still match by manifest name. Windows paths are handled.
+
 ## [1.3.1]
 
 ### Fixed

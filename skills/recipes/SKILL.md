@@ -38,7 +38,7 @@ Each editor opens the closest `*.md` to the file being edited, so contributors w
 
 ## Filter skills from a noisy dependency
 
-By default, agent-kit scans every installed package under `node_modules/` for a `skills/` folder and exports them all. When a dependency ships skills you don't want — too many, off-topic, duplicate with your own — use `pick` (allowlist) or `omit` (denylist) in `package.json`.
+By default, agent-kit scans the packages under `node_modules/` that your `package.json` declares (`dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`) for a `skills/` folder and exports them all; transitive packages are skipped unless `agentKit.includeTransitive` is `true`. When a dependency ships skills you don't want — too many, off-topic, duplicate with your own — use `pick` (allowlist) or `omit` (denylist) in `package.json`.
 
 ```json
 {

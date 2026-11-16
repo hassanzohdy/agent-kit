@@ -47,6 +47,16 @@ Resolution order: `--target` flag → `agentKit.targets` → built-in default (`
 
 `targets` gates only the **skills** export. The derive step always emits `CLAUDE.md`, `.gemini/GEMINI.md`, `.github/copilot-instructions.md`, and `CONVENTIONS.md` regardless.
 
+## `includeTransitive` — opt in to transitive packages
+
+With no `pick`, `sync` only exports skills from packages your `package.json` names in `dependencies`, `devDependencies`, `peerDependencies` or `optionalDependencies`. A package that merely arrived through another dependency cannot add skills to your agents. Set `"includeTransitive": true` to scan every package in `node_modules/` as older versions did. It does not affect `pick` (already an explicit allowlist), packages passed with `--path`, or the project's own `skills/`. In a monorepo each project applies the rule against its own `package.json`.
+
+A package matches by the folder it is installed in (`node_modules/<name>` or `node_modules/@scope/<name>`, so an `npm:` alias matches the key you wrote), not by the `name` in its own manifest, which a hoisted package could set to a declared name. Workspace and `file:` packages linked into `node_modules/` from a folder inside the project are kept, since they are the project's own code. Without a readable `package.json` no dependency is declared: dependency skills are skipped with a warning.
+
+```json
+{ "agentKit": { "includeTransitive": true } }
+```
+
 ## `pick` — allowlist
 
 When `pick` is set, **only** the listed packages are synced; everything else is dropped. Keys are exact package names.

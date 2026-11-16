@@ -55,7 +55,11 @@ describe("syncSkills directory and package-specifier links", () => {
     root = await mkdtemp(resolve(tmpdir(), "agent-kit-links-"));
     nodeModules = resolve(root, "node_modules");
     await mkdir(nodeModules, { recursive: true });
-    await writeFile(resolve(root, "package.json"), "{}", "utf8");
+    await writeFile(
+      resolve(root, "package.json"),
+      JSON.stringify({ agentKit: { includeTransitive: true } }),
+      "utf8",
+    );
   });
 
   afterEach(async () => {

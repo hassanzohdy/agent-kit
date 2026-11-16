@@ -79,7 +79,7 @@ So two projects can ship a same-named skill without colliding. (Dependency skill
 
 ## Per-project config is honored
 
-Each project's `node_modules/` skills are filtered by **that project's own** `agentKit.pick`/`omit` from its `package.json`. So `backend` can omit a noisy SDK that `frontend` doesn't even depend on:
+Each project's `node_modules/` skills are filtered by **that project's own** `agentKit.pick`/`omit` from its `package.json`; with no `pick`, only packages that project declares as dependencies are kept (unless its `agentKit.includeTransitive` is `true`). So `backend` can omit a noisy SDK that `frontend` doesn't even depend on:
 
 ```json
 // backend/package.json

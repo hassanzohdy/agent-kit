@@ -74,7 +74,11 @@ describe("syncSkills", () => {
 
   beforeEach(async () => {
     tempRoot = await mkdtemp(resolve(tmpdir(), "agent-kit-skills-"));
-    await writeFile(resolve(tempRoot, "package.json"), "{}", "utf8");
+    await writeFile(
+      resolve(tempRoot, "package.json"),
+      JSON.stringify({ agentKit: { includeTransitive: true } }),
+      "utf8",
+    );
     nodeModules = resolve(tempRoot, "node_modules");
     await mkdir(nodeModules, { recursive: true });
   });
@@ -514,7 +518,10 @@ describe("syncSkills with agentKit config", () => {
   async function writeRootPkg(body: Record<string, unknown>): Promise<void> {
     await writeFile(
       resolve(tempRoot, "package.json"),
-      JSON.stringify(body),
+      JSON.stringify({
+        ...body,
+        agentKit: { includeTransitive: true, ...(body.agentKit as object) },
+      }),
       "utf8",
     );
   }
@@ -794,6 +801,12 @@ describe("syncSkills with agentKit config", () => {
     await installFakePackage(nodeModules, "beta", [
       { name: "b", body: "x" },
     ]);
+    // Since 1.4.0 only declared dependencies are synced when there is no `pick`.
+    await writeFile(
+      resolve(tempRoot, "package.json"),
+      JSON.stringify({ dependencies: { alpha: "*", beta: "*" } }),
+      "utf8",
+    );
 
     const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
 
@@ -807,7 +820,11 @@ describe("syncSkills with scanPaths", () => {
 
   beforeEach(async () => {
     tempRoot = await mkdtemp(resolve(tmpdir(), "agent-kit-scanpaths-"));
-    await writeFile(resolve(tempRoot, "package.json"), "{}", "utf8");
+    await writeFile(
+      resolve(tempRoot, "package.json"),
+      JSON.stringify({ agentKit: { includeTransitive: true } }),
+      "utf8",
+    );
     nodeModules = resolve(tempRoot, "node_modules");
     await mkdir(nodeModules, { recursive: true });
   });
@@ -1009,5 +1026,136 @@ describe("syncSkills with scanPaths", () => {
       expect(await readFile(resolve(exportedAlpha, "docs/guide.md"), "utf8"))
         .toBe("![nested sibling](../../source-beta/SKILL.md#part)\n[ref]: ../../source-beta/SKILL.md#part");
     }
+  });
+});
+
+describe("syncSkills direct-dependency default", () => {
+  let tempRoot: string;
+  let nodeModules: string;
+
+  beforeEach(async () => {
+    tempRoot = await mkdtemp(resolve(tmpdir(), "agent-kit-direct-"));
+    nodeModules = resolve(tempRoot, "node_modules");
+    await mkdir(nodeModules, { recursive: true });
+    await installFakePackage(nodeModules, "direct-dep", [{ name: "s", body: "d" }]);
+    await installFakePackage(nodeModules, "@acme/dev-dep", [{ name: "s", body: "d" }]);
+    await installFakePackage(nodeModules, "transitive-dep", [{ name: "s", body: "t" }]);
+  });
+
+  afterEach(async () => {
+    await rm(tempRoot, { recursive: true, force: true });
+  });
+
+  const writeRoot = (body: Record<string, unknown>) =>
+    writeFile(resolve(tempRoot, "package.json"), JSON.stringify(body), "utf8");
+
+  it("syncs only packages named in the project's dependency maps", async () => {
+    await writeRoot({
+      name: "my-app",
+      dependencies: { "direct-dep": "1.0.0" },
+      devDependencies: { "@acme/dev-dep": "1.0.0" },
+    });
+
+    const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
+
+    expect([...result.packages].sort()).toEqual(["@acme/dev-dep", "direct-dep"]);
+    expect(
+      await fileExists(resolve(tempRoot, ".claude/skills/transitive-dep-s/SKILL.md")),
+    ).toBe(false);
+  });
+
+  it("counts peerDependencies and optionalDependencies as direct", async () => {
+    await writeRoot({
+      name: "my-app",
+      peerDependencies: { "direct-dep": "*" },
+      optionalDependencies: { "transitive-dep": "*" },
+    });
+
+    const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
+
+    expect([...result.packages].sort()).toEqual(["direct-dep", "transitive-dep"]);
+  });
+
+  it("includeTransitive: true restores the old behaviour", async () => {
+    await writeRoot({
+      name: "my-app",
+      dependencies: { "direct-dep": "1.0.0" },
+      agentKit: { includeTransitive: true },
+    });
+
+    const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
+
+    expect(result.packages).toContain("transitive-dep");
+    expect(result.packages).toContain("direct-dep");
+  });
+
+  it("matches by install folder, so a transitive package cannot claim a declared name", async () => {
+    await writeRoot({ name: "my-app", dependencies: { "direct-dep": "1.0.0" } });
+    // Installed under its own folder, but its manifest claims the declared name.
+    const spoofDir = resolve(nodeModules, "zzz-spoof");
+    await mkdir(resolve(spoofDir, "skills/s"), { recursive: true });
+    await writeFile(
+      resolve(spoofDir, "package.json"),
+      JSON.stringify({ name: "direct-dep" }),
+      "utf8",
+    );
+    await writeFile(resolve(spoofDir, "skills/s/SKILL.md"), "spoofed", "utf8");
+
+    const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
+
+    expect(result.packages).toEqual(["direct-dep"]);
+    expect(
+      await readFile(resolve(tempRoot, ".claude/skills/direct-dep-s/SKILL.md"), "utf8"),
+    ).toBe("d");
+  });
+
+  it("keeps the project's own workspace packages linked into node_modules", async () => {
+    await writeRoot({
+      name: "my-app",
+      workspaces: ["packages/*"],
+      dependencies: { "direct-dep": "1.0.0" },
+    });
+    const packages = resolve(tempRoot, "packages");
+    await installFakePackage(packages, "ws-lib", [{ name: "s", body: "w" }]);
+    await linkDirectory(resolve(packages, "ws-lib"), resolve(nodeModules, "ws-lib"));
+
+    const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
+
+    expect([...result.packages].sort()).toEqual(["direct-dep", "ws-lib"]);
+  });
+
+  it("pick also matches by install folder, so a hoisted package cannot claim a picked name", async () => {
+    await writeRoot({
+      name: "my-app",
+      dependencies: { "direct-dep": "1.0.0" },
+      agentKit: { pick: { "direct-dep": true } },
+    });
+    const spoofDir = resolve(nodeModules, "zzz-spoof");
+    await mkdir(resolve(spoofDir, "skills/s"), { recursive: true });
+    await writeFile(
+      resolve(spoofDir, "package.json"),
+      JSON.stringify({ name: "direct-dep" }),
+      "utf8",
+    );
+    await writeFile(resolve(spoofDir, "skills/s/SKILL.md"), "spoofed", "utf8");
+
+    const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
+
+    expect(result.packages).toEqual(["direct-dep"]);
+    expect(
+      await readFile(resolve(tempRoot, ".claude/skills/direct-dep-s/SKILL.md"), "utf8"),
+    ).toBe("d");
+  });
+
+  it("pick stays an explicit allowlist and may name a transitive package", async () => {
+    await writeRoot({
+      name: "my-app",
+      dependencies: { "direct-dep": "1.0.0" },
+      agentKit: { pick: { "transitive-dep": true } },
+    });
+
+    const result = await syncSkills({ root: tempRoot, targets: ["claude"] });
+
+    expect(result.packages).toEqual(["transitive-dep"]);
   });
 });

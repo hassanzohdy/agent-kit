@@ -51,6 +51,16 @@ export type AgentKitConfig = {
    */
   pick?: Record<string, true | string[]>;
   /**
+   * Sync skills from transitive packages too. Off by default: with no
+   * {@link pick}, only packages named in the project's `package.json`
+   * `dependencies`, `devDependencies`, `peerDependencies` or
+   * `optionalDependencies` are synced, so a package pulled in by another
+   * dependency cannot inject skills into your agents. Set `true` for the old
+   * behaviour (every package in `node_modules/`). Has no effect when `pick` is
+   * set, because `pick` is already an explicit allowlist.
+   */
+  includeTransitive?: boolean;
+  /**
    * Per-package skill exclusions (denylist). Map keys are package names
    * (exact match).
    *
@@ -171,6 +181,10 @@ function normalizeAgentKitConfig(raw: Record<string, unknown>): AgentKitConfig {
 
   const pick = normalizePackageRuleMap(raw.pick);
   if (pick !== null) config.pick = pick;
+
+  if (typeof raw.includeTransitive === "boolean") {
+    config.includeTransitive = raw.includeTransitive;
+  }
 
   const omit = normalizePackageRuleMap(raw.omit);
   if (omit !== null) config.omit = omit;

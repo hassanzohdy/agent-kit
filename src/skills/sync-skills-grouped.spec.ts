@@ -44,7 +44,9 @@ describe("syncSkills grouped layout", () => {
     // The "auto" default is covered in its own block below.
     await writeFile(
       resolve(root, "package.json"),
-      JSON.stringify({ agentKit: { layout: "grouped" } }),
+      JSON.stringify({
+        agentKit: { layout: "grouped", includeTransitive: true },
+      }),
       "utf8",
     );
   });
@@ -193,7 +195,11 @@ describe("syncSkills grouped layout", () => {
     await writeFile(
       resolve(root, "package.json"),
       JSON.stringify({
-        agentKit: { layout: "grouped", layoutOverrides: { foo: "flat" } },
+        agentKit: {
+          layout: "grouped",
+          layoutOverrides: { foo: "flat" },
+          includeTransitive: true,
+        },
       }),
       "utf8",
     );
@@ -245,7 +251,11 @@ describe("syncSkills grouped layout", () => {
 
   describe("auto layout (the default)", () => {
     beforeEach(async () => {
-      await writeFile(resolve(root, "package.json"), "{}", "utf8");
+      await writeFile(
+      resolve(root, "package.json"),
+      JSON.stringify({ agentKit: { includeTransitive: true } }),
+      "utf8",
+    );
     });
 
     it("(m) groups a package that ships skills/index.md", async () => {

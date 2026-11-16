@@ -94,7 +94,7 @@ await syncSkills({
 
 1. **One `AGENTS.md`, every agent.** `AGENTS.md` is the open standard — Codex, Cursor, Amp, Jules, Factory, Kilo, Windsurf, OpenCode read it natively. Claude Code, Gemini CLI, GitHub Copilot, and Aider want their own file. agent-kit derives them so they never drift.
 
-2. **Skills — your own, organized your way, plus skills from packages.** Drop a single `skills/` folder at your **project root**, grouped into nested category folders (`skills/backend/auth/SKILL.md`) as deep as you like. Claude Code only reads a flat `.claude/skills/`, so `agent-kit sync` flattens each nested path into a unique top-level name (`backend/auth` → `backend-auth`) — you organize for humans, agent-kit handles the flat requirement. The same walk also covers every package in `node_modules/` (plus any `--path` root), so **any npm package can ship skills too**, copied in with **flat, collision-free folder names** like `.claude/skills/warlock-js-core-add-connector/SKILL.md`.
+2. **Skills — your own, organized your way, plus skills from packages.** Drop a single `skills/` folder at your **project root**, grouped into nested category folders (`skills/backend/auth/SKILL.md`) as deep as you like. Claude Code only reads a flat `.claude/skills/`, so `agent-kit sync` flattens each nested path into a unique top-level name (`backend/auth` → `backend-auth`) — you organize for humans, agent-kit handles the flat requirement. The same walk also covers every package in `node_modules/` that your `package.json` declares as a dependency (`dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`; all of them with `agentKit.includeTransitive: true`) (plus any `--path` root), so **any npm package you depend on can ship skills too**, copied in with **flat, collision-free folder names** like `.claude/skills/warlock-js-core-add-connector/SKILL.md`.
 
 ## Key principles
 
@@ -129,7 +129,7 @@ Behavior:
 
 ## `agent-kit sync`
 
-Re-derive the per-tool files from `AGENTS.md` and export skills from installed packages.
+Re-derive the per-tool files from `AGENTS.md` and export skills from installed packages. With no `pick`, only packages declared in the project's `package.json` (`dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`) are scanned, so a transitive package cannot inject skills; set `agentKit.includeTransitive: true` to scan every package in `node_modules/`.
 
 Flags:
 
@@ -170,6 +170,7 @@ Configure defaults and filters from the project root's `package.json`:
   - `pick[pkg] = true` → include all of the package's skills.
   - `pick[pkg] = ["skill-name"]` → include only those specific skills.
   - Empty `pick: {}` or pick names that don't match installed packages → result is empty + warning.
+- **`includeTransitive`** — `true` scans every package in `node_modules/`, transitive ones included. Default `false`: with no `pick`, only packages named in `dependencies`, `devDependencies`, `peerDependencies` or `optionalDependencies` are synced. Not needed with `pick` (already an explicit allowlist); `--path` roots and the project's own `skills/` are unaffected.
 - **`omit`** (denylist) — runs AFTER `pick` when both are set.
   - `omit[pkg] = true` → skip the entire package's skills.
   - `omit[pkg] = ["skill-name"]` → skip specific skills from that package (matched against the source folder name, not the flat slug).
@@ -225,6 +226,7 @@ The `agentKit` block in the project root `package.json` sets defaults for every 
 
 - **`targets`** — default skill-sync agents. Resolution: `--target` → `agentKit.targets` → `["claude"]`. Empty `[]` honored + warns. Gates the skills export only; derived files always emit. `agent-kit init` seeds this field for you (default `["claude"]`, or `init --target …`); a value you already set is only overwritten when you pass `init --target`.
 - **`pick`** (allowlist) — when set, ONLY listed packages sync. `true` = whole package; `string[]` = named skills by source folder name. Empty `{}` = nothing (+warn).
+- **`includeTransitive`** — `true` restores scanning every package in `node_modules/`. Default `false`: with no `pick`, only declared dependencies (`dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`) are scanned, so a transitive package can't inject skills. Doesn't affect `pick`, `--path` roots or the project's own `skills/`; in a monorepo each project applies it against its own `package.json`. Packages match by their install folder (`node_modules/<name>`, `npm:` aliases included), never by their own manifest `name`; workspace / `file:` packages linked from inside the project are kept; with no readable `package.json`, dependency skills are skipped with a warning.
 - **`omit`** (denylist) — `true` = whole package; `string[]` = named skills. Runs AFTER `pick`. Pattern: `pick` a package, `omit` its noisy skill.
 - **`monorepo.projects`** — sibling project dirs / one-level globs to aggregate (see Monorepos skill). Each scanned as its own project, deps filtered by *its own* `pick`/`omit`, authored skills prefixed with the project dir name; root `omit` is a global veto. A project's own `targets`/`monorepo` are ignored; aggregation doesn't recurse.
 
@@ -243,7 +245,7 @@ Mental model: **each declared project is scanned as if `agent-kit sync` ran insi
 
 - **Authored skills are prefixed with the project dir name**: `backend/skills/code-standards` → `backend-code-standards`. Two projects can ship a same-named skill without colliding.
 - **Dependency skills keep their package-name slug** (`warlock-js-core-use-cache`) and **dedupe across projects to one copy** (union of kept skills).
-- **Per-project config**: each project's deps filtered by *its* `pick`/`omit`. A project's own authored skills are always included (`pick` never drops them).
+- **Per-project config**: each project's deps filtered by *its* `pick`/`omit`; with no `pick`, only packages that project declares as dependencies are kept (unless its `agentKit.includeTransitive` is `true`). A project's own authored skills are always included (`pick` never drops them).
 - **Root `omit` is a global veto** over the whole aggregate.
 - **`--projects` vs `--path`**: `--path X` treats X as a node_modules (children are packages); `--projects X` treats X as one project (its own `skills/` + `node_modules/`). They compose.
 - **One-level globs** only: `apps/*`, `packages/*`, bare `*`. Multi-level/mid-path globs unsupported.
@@ -256,7 +258,7 @@ Mental model: **each declared project is scanned as if `agent-kit sync` ran insi
 > **Auto-trigger:** user wires CI to catch derived-file drift, composes more than one tool/package/environment, or wants a multi-step setup recipe (filtering, programmatic API, watch mode).
 
 - **Per-workspace `AGENTS.md`**: run `agent-kit sync --cwd packages/api` per workspace (workspace-aware script) so each gets its own derived `CLAUDE.md`. (For aggregating skills across projects, see Monorepos.)
-- **Filter a noisy dependency**: `omit` (drop) or `pick` (allowlist) in `agentKit` — `true` for whole package, `string[]` for specific skills by source folder name.
+- **Filter a noisy dependency**: by default only declared dependencies are scanned (transitive packages are skipped unless `agentKit.includeTransitive` is `true`); `omit` (drop) or `pick` (allowlist) in `agentKit` — `true` for whole package, `string[]` for specific skills by source folder name.
 - **CI drift guardrail**: run `npx agent-kit sync` in CI then `git diff --exit-code` — fails if someone edited `AGENTS.md` but didn't commit the re-derived files.
 - **Programmatic API**: import `deriveAll` / `syncSkills` and call directly inside a longer Node pipeline (API takes `scanPaths`/`projects` arrays; CLI flags are comma-separated strings).
 - **Watch while iterating**: `agent-kit watch` re-runs sync on each change (150ms debounce); pair with `--target`/`--projects` to scope it.

@@ -21,7 +21,12 @@ import { type ProjectScanResult, scanProjects } from "../monorepo/scan-project";
 import type { SkillsTargetName, SyncSkillsOptions } from "../types";
 import { logger } from "../utils/logger";
 import type { SkillsLayout } from "../config/agent-kit-config";
-import { applyOmitFilter, applyPickFilter } from "./filters";
+import {
+  applyOmitFilter,
+  applyPickFilter,
+  filterToDirectDependencies,
+  restrictsToDirectDependencies,
+} from "./filters";
 import { readDescription, splitFrontmatter } from "./frontmatter";
 import {
   deriveSlugForSkill,
@@ -124,7 +129,15 @@ export async function syncSkills(
   // in parallel.
   const [rootScanResults, projectScans] = await Promise.all([
     Promise.all([
-      ...scannedPaths.map((p) => scanForSkillPackages(p)),
+      ...scannedPaths.map(async (p, index) => {
+        const scanned = await scanForSkillPackages(p);
+        // Only the project's own node_modules (always first) is restricted;
+        // paths passed explicitly through `scanPaths` are an opt-in already.
+        if (index !== 0 || !restrictsToDirectDependencies(config)) {
+          return scanned;
+        }
+        return filterToDirectDependencies(scanned, options.root);
+      }),
       scanLocalPackage(options.root),
     ]),
     scanProjects(resolvedProjects),
@@ -142,9 +155,14 @@ export async function syncSkills(
   // Flatten + dedupe by package name. Later scan-roots win, so a package
   // present in both node_modules and a user-provided scanPath gets the
   // scanPath copy (local override semantics).
+  // With a pick, filter each scan root before the dedupe: pick matches a
+  // node_modules package by its install folder, so a hoisted package whose
+  // manifest claims a picked name must not replace the real one here first.
   const byName = new Map<string, ScannedSkillPackage>();
   for (const scanned of rootScanResults as ScannedSkillPackage[][]) {
-    for (const pkg of scanned) {
+    const candidates =
+      config?.pick !== undefined ? applyPickFilter(scanned, config.pick) : scanned;
+    for (const pkg of candidates) {
       byName.set(pkg.pkg, pkg);
     }
   }

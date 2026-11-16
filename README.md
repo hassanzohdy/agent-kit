@@ -35,7 +35,7 @@ await syncSkills({ root, targets: ["claude", "cursor"] });
 |---|---|
 | **One source of truth** | Write project instructions in `AGENTS.md` once; every tool-specific file is derived from it. |
 | **Four built-in derive targets** | `CLAUDE.md`, `.gemini/GEMINI.md`, `.github/copilot-instructions.md`, `CONVENTIONS.md` — the agents that don't read root `AGENTS.md` natively. |
-| **Skills from `node_modules/`** | `sync` walks installed packages for `skills/` folders and exports them into `.claude/skills/`, `.cursor/skills/`, `.codex/skills/`, etc. |
+| **Skills from `node_modules/`** | `sync` walks installed packages for `skills/` folders (only those your `package.json` declares as dependencies unless you set `includeTransitive: true`) and exports them into `.claude/skills/`, `.cursor/skills/`, `.codex/skills/`, etc. |
 | **Collision-free flat naming** | Destinations are slugified as `<pkg-slug>[-skill-path]`, so two packages can never collide on the same folder. |
 | **Sentinel-based prune** | Every synced folder gets a `.agent-kit-managed` marker; only marked folders are pruned on the next sync, so user-authored skills stay safe. |
 | **Three CLI commands** | `init` scaffolds, `sync` regenerates, `watch` keeps a live dev loop. All idempotent. |
@@ -259,7 +259,7 @@ Every derived file is prefixed with an HTML-comment header noting the source fil
 
 ## Skills
 
-`syncSkills` (and `agent-kit sync`) reads `skills/` from your **project root** and from every package inside `node_modules/`, then copies each skill directory into the per-agent target paths with a flat, collision-proof folder name.
+`syncSkills` (and `agent-kit sync`) reads `skills/` from your **project root** and from every package inside `node_modules/` that your `package.json` lists as a dependency (all of them with `agentKit.includeTransitive: true`), then copies each skill directory into the per-agent target paths with a flat, collision-proof folder name.
 
 ### Organize your project's own skills in one nested folder
 
@@ -388,6 +388,7 @@ An optional `agentKit` block configures defaults that apply to every `agent-kit 
 |---|---|
 | `targets` | Default skill-sync targets when the CLI omits `--target`. |
 | `pick` | Allowlist — only listed packages are synced. `true` includes the whole package; `string[]` includes only the named skills (by source folder name). |
+| `includeTransitive` | `true` syncs skills from every package in `node_modules/`, transitive ones included. Default `false`: with no `pick`, only packages named in `dependencies`, `devDependencies`, `peerDependencies` or `optionalDependencies` are synced (a transitive package cannot inject skills into your agents). Not needed with `pick`. |
 | `omit` | Denylist — drop entire packages (`true`) or specific skills (`string[]`). Runs after `pick`. Also acts as a global veto over monorepo-aggregated skills. |
 | `layout` | `"auto"` (default), `"grouped"` or `"flat"` — see [Layouts](#layouts-grouped-vs-flat). |
 | `layoutOverrides` | Per-package `layout`, keyed by exact package name. |

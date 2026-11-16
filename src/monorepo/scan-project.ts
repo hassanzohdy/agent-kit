@@ -1,6 +1,11 @@
 import { resolve } from "pathe";
 import { loadAgentKitConfig } from "../config/agent-kit-config";
-import { applyOmitFilter, applyPickFilter } from "../skills/filters";
+import {
+  applyOmitFilter,
+  applyPickFilter,
+  filterToDirectDependencies,
+  restrictsToDirectDependencies,
+} from "../skills/filters";
 import {
   type ScannedSkillPackage,
   autoDiscoverSkills,
@@ -55,9 +60,13 @@ export async function scanProject(
       : null;
 
   // Dependency skills: scan the project's own node_modules, then apply the
-  // project's own pick (allowlist) and omit (denylist).
+  // project's own pick (allowlist) and omit (denylist). With no pick, only the
+  // project's declared dependencies are kept unless `includeTransitive` is set.
   const nodeModules = resolve(project.dir, "node_modules");
-  const scanned = await scanForSkillPackages(nodeModules);
+  let scanned = await scanForSkillPackages(nodeModules);
+  if (restrictsToDirectDependencies(config)) {
+    scanned = await filterToDirectDependencies(scanned, project.dir);
+  }
   const dependencies = applyOmitFilter(
     applyPickFilter(scanned, config?.pick),
     config?.omit,

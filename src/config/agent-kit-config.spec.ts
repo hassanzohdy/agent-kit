@@ -330,4 +330,22 @@ describe("loadAgentKitConfig", () => {
       expect(result?.monorepo).toBeUndefined();
     });
   });
+
+  describe("includeTransitive", () => {
+    it("loads a boolean and drops anything else", async () => {
+      await writeFile(
+        resolve(tempRoot, "package.json"),
+        JSON.stringify({ agentKit: { includeTransitive: true } }),
+        "utf8",
+      );
+      expect((await loadAgentKitConfig(tempRoot))?.includeTransitive).toBe(true);
+
+      await writeFile(
+        resolve(tempRoot, "package.json"),
+        JSON.stringify({ agentKit: { includeTransitive: "yes" } }),
+        "utf8",
+      );
+      expect((await loadAgentKitConfig(tempRoot))?.includeTransitive).toBeUndefined();
+    });
+  });
 });
